@@ -144,7 +144,7 @@ export default function UsersPage() {
 
   const handleTestConnection = async () => {
     try {
-      const response = await fetch('/api/test');
+      const response = await fetch('/api/health');
       const data = await response.json();
       
       if (response.ok) {

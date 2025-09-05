@@ -48,8 +48,8 @@ export default function DashboardPage() {
         setIsRefreshing(true);
       }
       
-      // Add cache busting parameter
-      const timestamp = Date.now();
+      // Add cache busting parameter - only on client side
+      const timestamp = typeof window !== 'undefined' ? Date.now() : 0;
       
       // Fetch recent activities
       const activitiesResponse = await fetch(`/api/dashboard/recent-activities?t=${timestamp}`, {

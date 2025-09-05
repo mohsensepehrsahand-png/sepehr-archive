@@ -81,10 +81,14 @@ export default function Header() {
     }
   };
 
-  const [currentDate, setCurrentDate] = useState(getCurrentPersianDate());
-  const [currentTime, setCurrentTime] = useState(getCurrentPersianTime());
+  const [currentDate, setCurrentDate] = useState('');
+  const [currentTime, setCurrentTime] = useState('');
 
   useEffect(() => {
+    // Initialize date and time on client side
+    setCurrentDate(getCurrentPersianDate());
+    setCurrentTime(getCurrentPersianTime());
+    
     // Update time every minute
     const interval = setInterval(() => {
       setCurrentDate(getCurrentPersianDate());

@@ -20,7 +20,8 @@ import {
   CalendarToday,
   Archive,
   AdminPanelSettings,
-  Security
+  Security,
+  History
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -38,6 +39,8 @@ const mainMenuItems = [
 // منوی مدیریت کاربران فقط برای ادمین
 const adminMenuItems = [
   { text: "مدیریت کاربران", icon: <AdminPanelSettings />, href: "/admin/users" },
+  { text: "تنظیمات", icon: <Settings />, href: "/settings" },
+  { text: "فعالیت‌های اخیر", icon: <History />, href: "/activities" },
 ];
 
 // منوی محدود برای کاربران غیر ادمین

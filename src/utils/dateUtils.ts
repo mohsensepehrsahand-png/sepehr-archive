@@ -42,6 +42,11 @@ export const formatPersianDateShort = (dateString: string | Date): string => {
 };
 
 export const getCurrentPersianDate = (): string => {
+  // Only run on client side to avoid hydration issues
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  
   const now = new Date();
   const options: Intl.DateTimeFormatOptions = {
     year: 'numeric',
@@ -67,6 +72,11 @@ export const getCurrentPersianDate = (): string => {
 };
 
 export const getCurrentPersianTime = (): string => {
+  // Only run on client side to avoid hydration issues
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  
   const now = new Date();
   return now.toLocaleTimeString('fa-IR', {
     hour: '2-digit',
