@@ -1,0 +1,246 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+/// @seed = "tsx prisma/seed.ts"
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:12345@localhost:5432/sepehr_archive"
+}
+
+/// Core domain models
+
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  passwordHash String
+  firstName   String?
+  lastName    String?
+  email       String?  @unique
+  role        Role
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdProjects Project[] @relation("ProjectCreatedBy")
+  createdFolders  Folder[]  @relation("FolderCreatedBy")
+  createdDocuments Document[] @relation("DocumentCreatedBy")
+  permissions     Permission[]
+  folderPermissions FolderPermissions[]
+  activities      ActivityLog[] @relation("UserActivities")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+
+  // Project palette
+  colorPrimary       String  @default("#1976d2")
+  colorFolderDefault String  @default("#90caf9")
+  colorDocImage      String  @default("#26a69a")
+  colorDocPdf        String  @default("#ef5350")
+  bgColor            String  @default("#ffffff")
+
+  createdBy   String
+  createdByUser User @relation("ProjectCreatedBy", fields: [createdBy], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  folders     Folder[]
+  documents   Document[]
+}
+
+model Folder {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  parentId    String?
+  parent      Folder?  @relation("FolderToChildren", fields: [parentId], references: [id])
+  children    Folder[] @relation("FolderToChildren")
+
+  name        String
+  description String?
+  tabKey      TabKey
+
+  // Materialized path for fast tree queries (e.g., "/root/child/grandchild")
+  path        String
+  depth       Int
+
+  sortOrder   Int       @default(0)
+
+  createdBy   String
+  createdByUser User    @relation("FolderCreatedBy", fields: [createdBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documents   Document[]
+  permissions FolderPermissions[]
+
+  @@index([projectId, path])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  folderId    String?  // Make folderId optional to support root level documents
+  folder      Folder?  @relation(fields: [folderId], references: [id]) // Make folder relation optional
+
+  name        String
+  description String?
+  tagsJson    String    @default("[]")
+  mimeType    String
+  fileExt     String
+  sizeBytes   Int
+  isUserUploaded Boolean @default(false)
+
+  createdBy   String
+  createdByUser User    @relation("DocumentCreatedBy", fields: [createdBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // For local storage, we store relative file path from storage root
+  filePath    String
+
+  // Future: multiple versions
+  versions    DocumentVersion[]
+
+  @@index([projectId, folderId])
+  @@index([isUserUploaded])
+}
+
+model DocumentVersion {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  version     Int
+  filePath    String
+  checksum    String
+  createdAt   DateTime @default(now())
+
+  @@unique([documentId, version])
+}
+
+model Permission {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  resourceType ResourceType
+  resourceId   String
+  tabKey       TabKey?
+  accessLevel  AccessLevel
+  expiresAt    DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, resourceType, resourceId])
+  @@unique([userId, resourceType, resourceId])
+}
+
+model FolderPermissions {
+  id        String   @id @default(cuid())
+  folderId  String
+  userId    String
+  canView   Boolean  @default(false)
+  canEdit   Boolean  @default(false)
+  canDelete Boolean  @default(false)
+  
+  folder    Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([folderId, userId])
+}
+
+model AppSettings {
+  id            Int      @id @default(1)
+  themePrimary  String   @default("#1976d2")
+  themeSecondary String  @default("#9c27b0")
+  themeBg       String   @default("#ffffff")
+  storageRoot   String?
+  maxUploadMb   Int      @default(100)
+  backupLastPath String?
+  locale        String   @default("fa")
+  
+  // Security Settings
+  sessionTimeout        Int     @default(30)
+  requirePasswordChange Int     @default(90)
+  maxLoginAttempts      Int     @default(5)
+  ipWhitelist          String?
+  ipBlacklist          String?
+  auditLogging         Boolean @default(true)
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("UserActivities", fields: [userId], references: [id])
+  action      ActivityAction
+  resourceType ResourceType
+  resourceId  String
+  resourceName String
+  description String?
+  metadata    String?  // JSON string for additional data
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+model LoginAttempt {
+  id          String   @id @default(cuid())
+  ipAddress   String
+  username    String?
+  success     Boolean
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([ipAddress, createdAt])
+  @@index([username, createdAt])
+}
+
+// Enums
+enum Role {
+  ADMIN
+  BUYER
+  CONTRACTOR
+  SUPPLIER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TabKey {
+  BUYER
+  CONTRACTOR
+  SUPPLIER
+}
+
+enum ResourceType {
+  PROJECT
+  FOLDER
+  DOCUMENT
+}
+
+enum AccessLevel {
+  VIEW
+  ADD
+  ADMIN
+}
+
+enum ActivityAction {
+  CREATE
+  UPDATE
+  DELETE
+  VIEW
+}
