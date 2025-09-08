@@ -79,7 +79,17 @@ export async function GET(request: NextRequest) {
       ];
     }
     if (actionFilter) {
-      where.action = actionFilter.toUpperCase();
+      // Map frontend action names to database enum values
+      const actionMap: { [key: string]: string } = {
+        'view': 'VIEW',
+        'download': 'DOWNLOAD',
+        'create': 'CREATE',
+        'delete': 'DELETE',
+        'update': 'UPDATE'
+      };
+      
+      const dbAction = actionMap[actionFilter.toLowerCase()] || actionFilter.toUpperCase();
+      where.action = dbAction;
     }
 
     // Get activity logs with user information
@@ -181,8 +191,18 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching activity logs:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      actionFilter,
+      search,
+      projectId
+    });
     return NextResponse.json(
-      { error: `Failed to fetch activity logs: ${error instanceof Error ? error.message : 'Unknown error'}` },
+      { 
+        error: `Failed to fetch activity logs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

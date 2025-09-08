@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/activityLogger";
+import { unlink, rmdir, readdir } from "fs/promises";
+import { join } from "path";
+import { existsSync } from "fs";
+
+// Helper function to delete directory recursively
+async function deleteDirectoryRecursive(dirPath: string): Promise<void> {
+  if (!existsSync(dirPath)) {
+    return;
+  }
+
+  const entries = await readdir(dirPath, { withFileTypes: true });
+  
+  for (const entry of entries) {
+    const fullPath = join(dirPath, entry.name);
+    
+    if (entry.isDirectory()) {
+      await deleteDirectoryRecursive(fullPath);
+    } else {
+      await unlink(fullPath);
+    }
+  }
+  
+  await rmdir(dirPath);
+}
 
 // GET /api/projects/[id] - دریافت جزئیات پروژه
 export async function GET(
@@ -64,6 +88,7 @@ export async function GET(
 
     const projectWithStats = {
       ...project,
+      status: project.status === 'ACTIVE' ? 'فعال' : 'آرشیو',
       documents: project.documents.length,
       folders: project.folders.length,
       createdBy: project.createdByUser ? 
@@ -128,22 +153,22 @@ export async function DELETE(
       );
     }
 
-    // Check if project has folders or documents
-    if (project.folders.length > 0 || project.documents.length > 0) {
-      return NextResponse.json({
-        hasContent: true,
-        foldersCount: project.folders.length,
-        documentsCount: project.documents.length,
-        message: `این پروژه شامل ${project.folders.length} پوشه و ${project.documents.length} سند است. آیا مطمئن هستید که می‌خواهید آن را حذف کنید؟`
-      }, { status: 409 }); // Conflict status for content confirmation
-    }
-
     // Check if this is a force delete (with content)
     const { searchParams } = new URL(request.url);
     const forceDelete = searchParams.get('force') === 'true';
 
-    if (forceDelete) {
-      // Delete all documents first
+    // Check if project has folders or documents
+    if (project.folders.length > 0 || project.documents.length > 0) {
+      if (!forceDelete) {
+        return NextResponse.json({
+          hasContent: true,
+          foldersCount: project.folders.length,
+          documentsCount: project.documents.length,
+          message: `این پروژه شامل ${project.folders.length} پوشه و ${project.documents.length} سند است. آیا مطمئن هستید که می‌خواهید آن را حذف کنید؟`
+        }, { status: 409 }); // Conflict status for content confirmation
+      }
+      
+      // Force delete: Delete all documents first
       await prisma.document.deleteMany({
         where: { projectId: id }
       });
@@ -152,6 +177,17 @@ export async function DELETE(
       await prisma.folder.deleteMany({
         where: { projectId: id }
       });
+
+      // Delete physical files and directories
+      try {
+        const projectUploadDir = join(process.cwd(), 'uploads', id);
+        if (existsSync(projectUploadDir)) {
+          await deleteDirectoryRecursive(projectUploadDir);
+        }
+      } catch (fileError) {
+        console.error('Error deleting physical files:', fileError);
+        // Continue with database deletion even if file deletion fails
+      }
     }
 
     // Log the deletion activity before deleting
@@ -248,7 +284,12 @@ export async function PUT(
       }
     });
 
-    return NextResponse.json(updatedProject);
+    const updatedProjectWithPersianStatus = {
+      ...updatedProject,
+      status: updatedProject.status === 'ACTIVE' ? 'فعال' : 'آرشیو'
+    };
+
+    return NextResponse.json(updatedProjectWithPersianStatus);
   } catch (error) {
     console.error('Error updating project:', error);
     return NextResponse.json(

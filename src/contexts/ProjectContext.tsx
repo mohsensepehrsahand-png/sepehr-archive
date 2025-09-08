@@ -23,6 +23,17 @@ interface ProjectContextType {
   deleteProject: (id: string, forceDelete?: boolean) => Promise<void>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<Project>;
   refreshProjects: () => Promise<void>;
+  // Confirmation dialog state
+  confirmationDialog: {
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: (() => void) | null;
+    loading: boolean;
+  };
+  showConfirmationDialog: (title: string, message: string, onConfirm: () => void) => void;
+  hideConfirmationDialog: () => void;
+  setConfirmationLoading: (loading: boolean) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -30,6 +41,13 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: null as (() => void) | null,
+    loading: false
+  });
 
   // Fetch projects on component mount
   useEffect(() => {
@@ -54,8 +72,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const addProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'colorPrimary' | 'colorFolderDefault' | 'documents' | 'createdBy'>) => {
     try {
-      console.log('Creating project with data:', projectData);
-      
       // ابتدا کاربر admin را پیدا می‌کنیم
       const userResponse = await fetch('/api/users');
       if (!userResponse.ok) {
@@ -82,8 +98,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           createdBy: adminUser.id
         }),
       });
-
-      console.log('Response status:', response.status);
       
       if (!response.ok) {
         const errorData = await response.text();
@@ -92,7 +106,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       }
 
       const savedProject = await response.json();
-      console.log('Project created successfully:', savedProject);
       
       // اضافه کردن به state محلی
       setProjects(prev => [savedProject, ...prev]);
@@ -129,6 +142,30 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       console.error('Error deleting project:', error);
       throw error;
     }
+  };
+
+  const showConfirmationDialog = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmationDialog({
+      open: true,
+      title,
+      message,
+      onConfirm,
+      loading: false
+    });
+  };
+
+  const hideConfirmationDialog = () => {
+    setConfirmationDialog({
+      open: false,
+      title: '',
+      message: '',
+      onConfirm: null,
+      loading: false
+    });
+  };
+
+  const setConfirmationLoading = (loading: boolean) => {
+    setConfirmationDialog(prev => ({ ...prev, loading }));
   };
 
   const updateProject = async (id: string, updates: Partial<Project>) => {
@@ -180,7 +217,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       addProject, 
       deleteProject, 
       updateProject, 
-      refreshProjects: fetchProjects 
+      refreshProjects: fetchProjects,
+      confirmationDialog,
+      showConfirmationDialog,
+      hideConfirmationDialog,
+      setConfirmationLoading
     }}>
       {children}
     </ProjectContext.Provider>

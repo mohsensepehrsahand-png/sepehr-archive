@@ -49,9 +49,20 @@ import MobileProjectCard from "@/components/mobile/MobileProjectCard";
 import DesktopProjectCard from "@/components/projects/DesktopProjectCard";
 import MobileSearchBar from "@/components/mobile/MobileSearchBar";
 import MobileFAB from "@/components/mobile/MobileFAB";
+import ConfirmationDialog from "@/components/common/ConfirmationDialog";
 
 export default function ProjectListPage() {
-  const { projects, loading, addProject, deleteProject, updateProject } = useProjects();
+  const { 
+    projects, 
+    loading, 
+    addProject, 
+    deleteProject, 
+    updateProject,
+    confirmationDialog,
+    showConfirmationDialog,
+    hideConfirmationDialog,
+    setConfirmationLoading
+  } = useProjects();
   const { isAdmin } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -66,6 +77,7 @@ export default function ProjectListPage() {
   });
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [openEditDialog, setOpenEditDialog] = useState(false);
+
 
   // Filter and search projects
   const filteredProjects = projects.filter(project => {
@@ -114,9 +126,23 @@ export default function ProjectListPage() {
         try {
           const contentInfo = JSON.parse(error.message);
           const confirmMessage = `${contentInfo.message}\n\nاین عملیات غیرقابل بازگشت است. آیا مطمئن هستید؟`;
-          if (confirm(confirmMessage)) {
-            await deleteProject(projectId, true);
-          }
+          
+          showConfirmationDialog(
+            "تایید حذف پروژه",
+            confirmMessage,
+            async () => {
+              setConfirmationLoading(true);
+              try {
+                await deleteProject(projectId, true);
+                hideConfirmationDialog();
+              } catch (deleteError) {
+                console.error('Error force deleting project:', deleteError);
+                alert('خطا در حذف پروژه');
+              } finally {
+                setConfirmationLoading(false);
+              }
+            }
+          );
         } catch (parseError) {
           console.error('Error parsing content info:', parseError);
           alert('خطا در حذف پروژه');
@@ -379,6 +405,19 @@ export default function ProjectListPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        open={confirmationDialog.open}
+        onClose={hideConfirmationDialog}
+        onConfirm={() => confirmationDialog.onConfirm?.()}
+        title={confirmationDialog.title}
+        message={confirmationDialog.message}
+        confirmText="حذف"
+        cancelText="انصراف"
+        severity="error"
+        loading={confirmationDialog.loading}
+      />
     </Container>
   );
 }

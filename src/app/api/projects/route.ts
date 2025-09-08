@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       id: project.id,
       name: project.name,
       description: project.description,
-      status: project.status,
+      status: project.status === 'ACTIVE' ? 'فعال' : 'آرشیو',
       documents: project.documents.length,
       folders: project.folders.length,
       createdBy: project.createdByUser ? 
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
       id: project.id,
       name: project.name,
       description: project.description,
-      status: project.status,
+      status: project.status === 'ACTIVE' ? 'فعال' : 'آرشیو',
       documents: 0, // New project has no documents yet
       folders: 0,   // New project has no folders yet
       createdBy: project.createdByUser ? 

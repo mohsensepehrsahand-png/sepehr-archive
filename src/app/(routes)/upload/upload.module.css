@@ -1,0 +1,641 @@
+/* Upload Page Custom Styles */
+.uploadContainer {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  font-family: 'Vazirmatn', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.uploadCard {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 3rem;
+  max-width: 1200px;
+  width: 100%;
+  border: 1px solid #e5e7eb;
+}
+
+/* Desktop Layout */
+@media (min-width: 1024px) {
+  .uploadCard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: start;
+  }
+  
+  .uploadMainContent {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  
+  .uploadSidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+}
+
+.uploadHeader {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.uploadTitle {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 1rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.uploadSubtitle {
+  font-size: 1.125rem;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.uploadArea {
+  border: 3px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 3rem 2rem;
+  text-align: center;
+  transition: all 0.3s ease;
+  background: #fafafa;
+  position: relative;
+  overflow: hidden;
+}
+
+.uploadArea:hover {
+  border-color: #10b981;
+  background: #f0fdf4;
+  transform: translateY(-2px);
+}
+
+.uploadArea.dragActive {
+  border-color: #10b981;
+  background: #f0fdf4;
+  transform: scale(1.02);
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.2);
+}
+
+.uploadIcon {
+  font-size: 4rem;
+  color: #9ca3af;
+  margin-bottom: 1.5rem;
+  display: block;
+}
+
+.uploadArea.dragActive .uploadIcon {
+  color: #10b981;
+  transform: scale(1.1);
+}
+
+.uploadText {
+  margin-bottom: 2rem;
+}
+
+.uploadMainText {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.uploadSubText {
+  font-size: 1rem;
+  color: #6b7280;
+}
+
+.uploadButton {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 1rem 3rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.3);
+  position: relative;
+  overflow: hidden;
+  min-width: 200px;
+}
+
+.uploadButton:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px 0 rgba(16, 185, 129, 0.4);
+}
+
+.uploadButton:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.3);
+}
+
+.uploadButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.2);
+}
+
+.uploadButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.uploadButton:hover::before {
+  left: 100%;
+}
+
+.uploadProgress {
+  margin-top: 2rem;
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.uploadProgressTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 1rem;
+}
+
+.uploadProgressItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.uploadProgressInfo {
+  flex: 1;
+}
+
+.uploadProgressFileName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.uploadProgressPercentage {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.uploadProgressBar {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.uploadProgressFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.uploadProgressFill.completed {
+  background: #10b981;
+}
+
+.uploadProgressFill.error {
+  background: #ef4444;
+}
+
+.uploadProgressFill.uploading {
+  background: #3b82f6;
+}
+
+.uploadResult {
+  margin-top: 2rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.uploadResultHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.uploadResultIcon {
+  font-size: 1.5rem;
+}
+
+.uploadResultTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #166534;
+}
+
+.uploadResultStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.uploadResultStat {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  border: 1px solid #d1fae5;
+}
+
+.uploadResultStatNumber {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.uploadResultStatNumber.projects {
+  color: #3b82f6;
+}
+
+.uploadResultStatNumber.folders {
+  color: #10b981;
+}
+
+.uploadResultStatNumber.documents {
+  color: #8b5cf6;
+}
+
+.uploadResultStatLabel {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.uploadErrors {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.uploadErrorsTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #991b1b;
+  margin-bottom: 0.5rem;
+}
+
+.uploadErrorsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.uploadErrorsItem {
+  font-size: 0.875rem;
+  color: #b91c1c;
+  margin-bottom: 0.25rem;
+}
+
+/* Loading Animation */
+.loadingSpinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid transparent;
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Go to Project Button */
+.goToProjectButton {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0;
+  width: 100%;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.goToProjectButton:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px 0 rgba(59, 130, 246, 0.4);
+  text-decoration: none;
+  color: white;
+}
+
+.goToProjectButton:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+}
+
+.goToProjectButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.goToProjectButton:hover::before {
+  left: 100%;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Sidebar Styles */
+.uploadSidebar {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .uploadSidebar {
+    display: block;
+  }
+}
+
+.uploadSidebarContent {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.uploadSidebarTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.uploadSidebarTitle::before {
+  content: '📊';
+  font-size: 1.25rem;
+}
+
+.uploadSidebarStats {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.uploadSidebarStat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.uploadSidebarStatLabel {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.uploadSidebarStatValue {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.uploadSidebarStatValue.projects {
+  color: #3b82f6;
+}
+
+.uploadSidebarStatValue.folders {
+  color: #10b981;
+}
+
+.uploadSidebarStatValue.documents {
+  color: #8b5cf6;
+}
+
+.uploadSidebarErrors {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.uploadSidebarErrorsTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #991b1b;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.uploadSidebarErrorsTitle::before {
+  content: '⚠️';
+  font-size: 1rem;
+}
+
+.uploadSidebarErrorsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.uploadSidebarErrorsItem {
+  font-size: 0.75rem;
+  color: #b91c1c;
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+.uploadSidebarProgress {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.uploadSidebarProgressTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.uploadSidebarProgressTitle::before {
+  content: '⏳';
+  font-size: 1rem;
+}
+
+.uploadSidebarProgressItem {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.uploadSidebarProgressFileName {
+  font-size: 0.75rem;
+  color: #374151;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.uploadSidebarProgressBar {
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.uploadSidebarProgressFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.uploadSidebarProgressFill.completed {
+  background: #10b981;
+}
+
+.uploadSidebarProgressFill.error {
+  background: #ef4444;
+}
+
+.uploadSidebarProgressFill.uploading {
+  background: #3b82f6;
+}
+
+.uploadSidebarProjects {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.uploadSidebarProjectsTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0c4a6e;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.uploadSidebarProjectsTitle::before {
+  content: '📁';
+  font-size: 1rem;
+}
+
+.uploadSidebarProjectButton {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.uploadSidebarProjectButton:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-1px);
+}
+
+/* Hide mobile results on desktop */
+@media (min-width: 1024px) {
+  .uploadResult {
+    display: none;
+  }
+  
+  .uploadProgress {
+    display: none;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .uploadContainer {
+    padding: 1rem;
+  }
+  
+  .uploadCard {
+    padding: 2rem;
+  }
+  
+  .uploadTitle {
+    font-size: 2rem;
+  }
+  
+  .uploadArea {
+    padding: 2rem 1rem;
+  }
+  
+  .uploadButton {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+  }
+  
+  .uploadResultStats {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}

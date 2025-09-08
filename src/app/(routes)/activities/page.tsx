@@ -25,7 +25,13 @@ import {
   Card,
   CardContent,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Collapse,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Badge,
+  Stack
 } from "@mui/material";
 import { 
   Search, 
@@ -38,7 +44,14 @@ import {
   Refresh,
   Clear,
   History,
-  ArrowBack
+  ArrowBack,
+  ExpandMore,
+  Description,
+  Business,
+  FolderOpen,
+  Today,
+  Schedule,
+  CalendarMonth
 } from "@mui/icons-material";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -81,6 +94,8 @@ export default function ActivitiesPage() {
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const [groupBy, setGroupBy] = useState<'date' | 'type' | 'none'>('date');
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['today', 'yesterday']));
 
   const fetchActivities = async (reset = false) => {
     try {
@@ -94,7 +109,18 @@ export default function ActivitiesPage() {
       });
       
       if (searchTerm) params.append('search', searchTerm);
-      if (actionFilter) params.append('action', actionFilter);
+      if (actionFilter) {
+        // Map frontend action names to API expected values
+        const actionMap: { [key: string]: string } = {
+          'view': 'view',
+          'download': 'download',
+          'create': 'create',
+          'delete': 'delete',
+          'update': 'update'
+        };
+        const apiAction = actionMap[actionFilter] || actionFilter;
+        params.append('action', apiAction);
+      }
       if (projectFilter) params.append('projectId', projectFilter);
       
       const response = await fetch(`/api/activity-log?${params}`);
@@ -235,6 +261,241 @@ export default function ActivitiesPage() {
     const project = projects.find(p => p.id === projectId);
     return project?.name || 'پروژه نامشخص';
   };
+
+  // Group activities by date
+  const groupActivitiesByDate = (activities: Activity[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const thisWeek = new Date(today);
+    thisWeek.setDate(thisWeek.getDate() - 7);
+
+    const groups = {
+      today: [] as Activity[],
+      yesterday: [] as Activity[],
+      thisWeek: [] as Activity[],
+      older: [] as Activity[]
+    };
+
+    activities.forEach(activity => {
+      const activityDate = new Date(activity.timestamp);
+      const activityDateOnly = new Date(activityDate.getFullYear(), activityDate.getMonth(), activityDate.getDate());
+
+      if (activityDateOnly.getTime() === today.getTime()) {
+        groups.today.push(activity);
+      } else if (activityDateOnly.getTime() === yesterday.getTime()) {
+        groups.yesterday.push(activity);
+      } else if (activityDate >= thisWeek) {
+        groups.thisWeek.push(activity);
+      } else {
+        groups.older.push(activity);
+      }
+    });
+
+    return groups;
+  };
+
+  // Group activities by type
+  const groupActivitiesByType = (activities: Activity[]) => {
+    const groups = {
+      document: [] as Activity[],
+      project: [] as Activity[],
+      folder: [] as Activity[]
+    };
+
+    activities.forEach(activity => {
+      if (activity.type === 'document') {
+        groups.document.push(activity);
+      } else if (activity.type === 'project') {
+        groups.project.push(activity);
+      } else if (activity.type === 'folder') {
+        groups.folder.push(activity);
+      }
+    });
+
+    return groups;
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'document': return <Description />;
+      case 'project': return <Business />;
+      case 'folder': return <FolderOpen />;
+      default: return <History />;
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'document': return 'primary';
+      case 'project': return 'secondary';
+      case 'folder': return 'success';
+      default: return 'default';
+    }
+  };
+
+  const getTypeText = (type: string) => {
+    switch (type) {
+      case 'document': return 'اسناد';
+      case 'project': return 'پروژه‌ها';
+      case 'folder': return 'پوشه‌ها';
+      default: return type;
+    }
+  };
+
+  const getDateGroupIcon = (group: string) => {
+    switch (group) {
+      case 'today': return <Today />;
+      case 'yesterday': return <Schedule />;
+      case 'thisWeek': return <CalendarMonth />;
+      case 'older': return <History />;
+      default: return <History />;
+    }
+  };
+
+  const getDateGroupText = (group: string) => {
+    switch (group) {
+      case 'today': return 'امروز';
+      case 'yesterday': return 'دیروز';
+      case 'thisWeek': return 'این هفته';
+      case 'older': return 'قدیمی‌تر';
+      default: return group;
+    }
+  };
+
+  const toggleSection = (sectionId: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(sectionId)) {
+      newExpanded.delete(sectionId);
+    } else {
+      newExpanded.add(sectionId);
+    }
+    setExpandedSections(newExpanded);
+  };
+
+  // Component for rendering individual activity
+  const ActivityItem = ({ activity, index }: { activity: Activity; index: number }) => (
+    <Card 
+      sx={{ 
+        mb: 1, 
+        borderRadius: 2,
+        boxShadow: 1,
+        '&:hover': {
+          boxShadow: 3,
+          transform: 'translateY(-1px)',
+          transition: 'all 0.2s ease-in-out'
+        }
+      }}
+    >
+      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+          <Avatar 
+            sx={{ 
+              width: 48, 
+              height: 48,
+              bgcolor: `${getActionColor(activity.action)}.light`,
+              color: `${getActionColor(activity.action)}.main`
+            }}
+          >
+            {getActionIcon(activity.action)}
+          </Avatar>
+          
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+              <Typography 
+                variant="subtitle1" 
+                fontWeight="bold"
+                sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+              >
+                {activity.userName}
+              </Typography>
+              <Chip 
+                label={getActionText(activity.action)}
+                size="small"
+                color={getActionColor(activity.action) as any}
+                variant="outlined"
+                icon={getActionIcon(activity.action)}
+              />
+              <Chip 
+                label={getProjectName(activity.projectId)}
+                size="small"
+                color="info"
+                variant="outlined"
+                icon={getTypeIcon(activity.type)}
+              />
+            </Box>
+            
+            <Typography 
+              variant="body2" 
+              color="text.secondary"
+              sx={{ 
+                fontFamily: 'Vazirmatn, Arial, sans-serif', 
+                mb: 1,
+                lineHeight: 1.5
+              }}
+            >
+              {(() => {
+                const parts = [];
+                
+                if (activity.folderName) {
+                  parts.push(`پوشه: ${activity.folderName}`);
+                }
+                
+                if (activity.documentName) {
+                  parts.push(`سند: ${activity.documentName}`);
+                }
+                
+                if (activity.details) {
+                  parts.push(activity.details);
+                }
+                
+                if (activity.metadata) {
+                  try {
+                    const metadata = JSON.parse(activity.metadata);
+                    if (metadata.folderName && metadata.folderName !== activity.folderName) {
+                      parts.push(`در پوشه: ${metadata.folderName}`);
+                    }
+                    if (metadata.action && metadata.action !== activity.action) {
+                      parts.push(`عملیات: ${metadata.action}`);
+                    }
+                  } catch {
+                    // Ignore JSON parse errors
+                  }
+                }
+                
+                return parts.length > 0 ? parts.join(' - ') : getActionText(activity.action);
+              })()}
+            </Typography>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Typography 
+                variant="caption" 
+                color="text.secondary"
+                sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+              >
+                {formatTime(activity.timestamp)}
+              </Typography>
+              <Typography 
+                variant="caption" 
+                color="text.disabled"
+                sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+              >
+                •
+              </Typography>
+              <Typography 
+                variant="caption" 
+                color="text.secondary"
+                sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+              >
+                {formatPersianDate(activity.timestamp)}
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -379,6 +640,24 @@ export default function ActivitiesPage() {
           </Grid>
 
           <Grid item xs={12} md={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>دسته‌بندی</InputLabel>
+              <Select
+                value={groupBy}
+                label="دسته‌بندی"
+                onChange={(e) => setGroupBy(e.target.value as 'date' | 'type' | 'none')}
+                sx={{ '& .MuiSelect-select': { fontFamily: 'Vazirmatn, Arial, sans-serif' } }}
+              >
+                <MenuItem value="date" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>بر اساس تاریخ</MenuItem>
+                <MenuItem value="type" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>بر اساس نوع</MenuItem>
+                <MenuItem value="none" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>بدون دسته‌بندی</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
+        
+        <Grid container spacing={2} sx={{ mt: 1 }}>
+          <Grid item xs={12} md={2}>
             <Button
               fullWidth
               variant="outlined"
@@ -390,10 +669,82 @@ export default function ActivitiesPage() {
                 height: '40px'
               }}
             >
-              پاک کردن
+              پاک کردن فیلترها
             </Button>
           </Grid>
         </Grid>
+
+        {/* Quick Filter Chips */}
+        <Box sx={{ mt: 2 }}>
+          <Typography 
+            variant="subtitle2" 
+            sx={{ 
+              fontFamily: 'Vazirmatn, Arial, sans-serif', 
+              mb: 1,
+              color: 'text.secondary'
+            }}
+          >
+            فیلترهای سریع:
+          </Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Chip
+              label="همه فعالیت‌ها"
+              variant={!actionFilter ? "filled" : "outlined"}
+              color="primary"
+              onClick={() => setActionFilter("")}
+              icon={<History />}
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            />
+            <Chip
+              label="مشاهده"
+              variant={actionFilter === "view" ? "filled" : "outlined"}
+              color="primary"
+              onClick={() => setActionFilter(actionFilter === "view" ? "" : "view")}
+              icon={<Visibility />}
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            />
+            <Chip
+              label="دانلود"
+              variant={actionFilter === "download" ? "filled" : "outlined"}
+              color="secondary"
+              onClick={() => setActionFilter(actionFilter === "download" ? "" : "download")}
+              icon={<Download />}
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            />
+            <Chip
+              label="ایجاد"
+              variant={actionFilter === "create" ? "filled" : "outlined"}
+              color="success"
+              onClick={() => setActionFilter(actionFilter === "create" ? "" : "create")}
+              icon={<Create />}
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            />
+            <Chip
+              label="حذف"
+              variant={actionFilter === "delete" ? "filled" : "outlined"}
+              color="error"
+              onClick={() => setActionFilter(actionFilter === "delete" ? "" : "delete")}
+              icon={<Delete />}
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            />
+            <Chip
+              label="امروز"
+              variant={groupBy === "date" ? "filled" : "outlined"}
+              color="info"
+              onClick={() => setGroupBy(groupBy === "date" ? "none" : "date")}
+              icon={<Today />}
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            />
+            <Chip
+              label="بر اساس نوع"
+              variant={groupBy === "type" ? "filled" : "outlined"}
+              color="info"
+              onClick={() => setGroupBy(groupBy === "type" ? "none" : "type")}
+              icon={<FilterList />}
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            />
+          </Stack>
+        </Box>
       </Paper>
 
       {/* Content */}
@@ -423,142 +774,145 @@ export default function ActivitiesPage() {
             </Typography>
           </Box>
         ) : (
-          <List sx={{ p: 0 }}>
-            {activities.map((activity, index) => (
-              <ListItem 
-                key={activity.id}
-                sx={{ 
-                  borderBottom: index < activities.length - 1 ? 1 : 0,
-                  borderColor: 'divider',
-                  '&:hover': {
-                    bgcolor: 'action.hover'
-                  }
-                }}
-              >
-                <ListItemIcon>
-                  <Avatar 
-                    sx={{ 
-                      width: 40, 
-                      height: 40,
-                      bgcolor: `${getActionColor(activity.action)}.light`,
-                      color: `${getActionColor(activity.action)}.main`
-                    }}
-                  >
-                    {getActionIcon(activity.action)}
-                  </Avatar>
-                </ListItemIcon>
-                
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
-                      <Typography 
-                        variant="body1" 
-                        fontWeight="bold"
-                        sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+          <Box sx={{ p: 2 }}>
+            {groupBy === 'date' && (() => {
+              const dateGroups = groupActivitiesByDate(activities);
+              return (
+                <Stack spacing={2}>
+                  {Object.entries(dateGroups).map(([groupKey, groupActivities]) => {
+                    if (groupActivities.length === 0) return null;
+                    const isExpanded = expandedSections.has(groupKey);
+                    
+                    return (
+                      <Accordion 
+                        key={groupKey}
+                        expanded={isExpanded}
+                        onChange={() => toggleSection(groupKey)}
+                        sx={{ 
+                          boxShadow: 2,
+                          borderRadius: 2,
+                          '&:before': { display: 'none' }
+                        }}
                       >
-                        {activity.userName}
-                      </Typography>
-                      <Chip 
-                        label={getActionText(activity.action)}
-                        size="small"
-                        color={getActionColor(activity.action) as any}
-                        variant="outlined"
-                      />
-                      <Chip 
-                        label={getProjectName(activity.projectId)}
-                        size="small"
-                        color="info"
-                        variant="outlined"
-                      />
-                    </Box>
-                  }
-                  secondary={
-                    <Box>
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary"
-                        sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', mb: 0.5 }}
-                      >
-                        {(() => {
-                          const parts = [];
-                          
-                          // Add folder name if available
-                          if (activity.folderName) {
-                            parts.push(`پوشه: ${activity.folderName}`);
-                          }
-                          
-                          // Add document name if available
-                          if (activity.documentName) {
-                            parts.push(`سند: ${activity.documentName}`);
-                          }
-                          
-                          // Add action details
-                          if (activity.details) {
-                            parts.push(activity.details);
-                          }
-                          
-                          // Add metadata details if available
-                          if (activity.metadata) {
-                            try {
-                              const metadata = JSON.parse(activity.metadata);
-                              if (metadata.folderName && metadata.folderName !== activity.folderName) {
-                                parts.push(`در پوشه: ${metadata.folderName}`);
-                              }
-                              if (metadata.action && metadata.action !== activity.action) {
-                                parts.push(`عملیات: ${metadata.action}`);
-                              }
-                            } catch {
-                              // Ignore JSON parse errors
+                        <AccordionSummary
+                          expandIcon={<ExpandMore />}
+                          sx={{ 
+                            bgcolor: 'primary.light',
+                            borderRadius: 2,
+                            '&.Mui-expanded': {
+                              borderRadius: '8px 8px 0 0'
                             }
-                          }
-                          
-                          return parts.length > 0 ? parts.join(' - ') : getActionText(activity.action);
-                        })()}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        <Typography 
-                          variant="caption" 
-                          color="text.secondary"
-                          sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+                          }}
                         >
-                          {formatTime(activity.timestamp)}
-                        </Typography>
-                        <Typography 
-                          variant="caption" 
-                          color="text.disabled"
-                          sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Badge badgeContent={groupActivities.length} color="primary">
+                              {getDateGroupIcon(groupKey)}
+                            </Badge>
+                            <Typography 
+                              variant="h6" 
+                              fontWeight="bold"
+                              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+                            >
+                              {getDateGroupText(groupKey)}
+                            </Typography>
+                          </Box>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ p: 2 }}>
+                          <Stack spacing={1}>
+                            {groupActivities.map((activity, index) => (
+                              <ActivityItem key={activity.id} activity={activity} index={index} />
+                            ))}
+                          </Stack>
+                        </AccordionDetails>
+                      </Accordion>
+                    );
+                  })}
+                </Stack>
+              );
+            })()}
+
+            {groupBy === 'type' && (() => {
+              const typeGroups = groupActivitiesByType(activities);
+              return (
+                <Stack spacing={2}>
+                  {Object.entries(typeGroups).map(([typeKey, typeActivities]) => {
+                    if (typeActivities.length === 0) return null;
+                    const isExpanded = expandedSections.has(typeKey);
+                    
+                    return (
+                      <Accordion 
+                        key={typeKey}
+                        expanded={isExpanded}
+                        onChange={() => toggleSection(typeKey)}
+                        sx={{ 
+                          boxShadow: 2,
+                          borderRadius: 2,
+                          '&:before': { display: 'none' }
+                        }}
+                      >
+                        <AccordionSummary
+                          expandIcon={<ExpandMore />}
+                          sx={{ 
+                            bgcolor: `${getTypeColor(typeKey)}.light`,
+                            borderRadius: 2,
+                            '&.Mui-expanded': {
+                              borderRadius: '8px 8px 0 0'
+                            }
+                          }}
                         >
-                          •
-                        </Typography>
-                        <Typography 
-                          variant="caption" 
-                          color="text.secondary"
-                          sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
-                        >
-                          {formatPersianDate(activity.timestamp)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  }
-                />
-              </ListItem>
-            ))}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Badge badgeContent={typeActivities.length} color={getTypeColor(typeKey) as any}>
+                              {getTypeIcon(typeKey)}
+                            </Badge>
+                            <Typography 
+                              variant="h6" 
+                              fontWeight="bold"
+                              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+                            >
+                              {getTypeText(typeKey)}
+                            </Typography>
+                          </Box>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ p: 2 }}>
+                          <Stack spacing={1}>
+                            {typeActivities.map((activity, index) => (
+                              <ActivityItem key={activity.id} activity={activity} index={index} />
+                            ))}
+                          </Stack>
+                        </AccordionDetails>
+                      </Accordion>
+                    );
+                  })}
+                </Stack>
+              );
+            })()}
+
+            {groupBy === 'none' && (
+              <Stack spacing={1}>
+                {activities.map((activity, index) => (
+                  <ActivityItem key={activity.id} activity={activity} index={index} />
+                ))}
+              </Stack>
+            )}
             
             {hasMore && (
-              <ListItem>
-                <Box sx={{ width: '100%', textAlign: 'center', py: 2 }}>
-                  <Button 
-                    onClick={handleLoadMore}
-                    disabled={loading}
-                    variant="outlined"
-                    sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
-                  >
-                    {loading ? <CircularProgress size={20} /> : 'بارگذاری بیشتر'}
-                  </Button>
-                </Box>
-              </ListItem>
+              <Box sx={{ textAlign: 'center', py: 3 }}>
+                <Button 
+                  onClick={handleLoadMore}
+                  disabled={loading}
+                  variant="outlined"
+                  size="large"
+                  sx={{ 
+                    fontFamily: 'Vazirmatn, Arial, sans-serif',
+                    borderRadius: 2,
+                    px: 4
+                  }}
+                >
+                  {loading ? <CircularProgress size={20} /> : 'بارگذاری بیشتر'}
+                </Button>
+              </Box>
             )}
-          </List>
+          </Box>
         )}
       </Paper>
     </Container>
