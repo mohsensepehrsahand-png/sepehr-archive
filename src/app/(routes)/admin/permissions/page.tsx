@@ -378,9 +378,9 @@ export default function PermissionManagementPage() {
               <TableContainer>
                 <Table size="small">
                   <TableHead>
-                    <TableRow>
-                      <TableCell>مجوز</TableCell>
-                      <TableCell>توضیحات</TableCell>
+                    <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                      <TableCell sx={{ fontWeight: 'bold' }}>مجوز</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>توضیحات</TableCell>
                       {roles.map((role) => (
                         <TableCell key={role.name} align="center">
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -396,8 +396,16 @@ export default function PermissionManagementPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {module.permissions.map((permission) => (
-                      <TableRow key={permission.id}>
+                    {module.permissions.map((permission, index) => (
+                      <TableRow 
+                        key={permission.id}
+                        sx={{ 
+                          backgroundColor: index % 2 === 0 ? '#fafafa' : '#ffffff',
+                          '&:hover': {
+                            backgroundColor: '#f0f0f0'
+                          }
+                        }}
+                      >
                         <TableCell>
                           <Typography variant="body2" fontWeight="medium">
                             {permission.label}

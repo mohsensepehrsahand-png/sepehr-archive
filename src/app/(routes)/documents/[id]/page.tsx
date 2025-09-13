@@ -155,13 +155,15 @@ export default function DocumentViewerPage({ params }: Props) {
               component={Link}
               href="/projects"
               variant="outlined"
-              startIcon={<ArrowBack />}
+              startIcon={<ArrowBack sx={{ transform: 'rotate(180deg)' }} />}
               size="small"
               sx={{ 
                 borderRadius: 2, 
                 px: 2,
                 fontFamily: 'Vazirmatn, Arial, sans-serif',
-                width: { xs: '100%', sm: 'auto' }
+                width: { xs: '100%', sm: 'auto' },
+                direction: 'rtl',
+                '& .MuiButton-startIcon': { ml: 1 }
               }}
             >
               بازگشت

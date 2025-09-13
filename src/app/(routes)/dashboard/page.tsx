@@ -9,6 +9,7 @@ import { useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import CompactProjectCard from "@/components/dashboard/CompactProjectCard";
+import FinancialDashboard from "@/components/dashboard/FinancialDashboard";
 import { formatPersianDate, formatRelativeTime } from "@/utils/dateUtils";
 
 
@@ -213,21 +214,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Safe calculation functions
-  const getSafeNumber = (value: any, defaultValue: number = 0): number => {
-    if (value === null || value === undefined || isNaN(value)) {
-      return defaultValue;
-    }
-    const num = Number(value);
-    return isNaN(num) ? defaultValue : num;
-  };
-
-  const getSafeString = (value: any, defaultValue: string = ''): string => {
-    if (value === null || value === undefined || isNaN(value)) {
-      return defaultValue;
-    }
-    return String(value);
-  };
 
   // Helper function to format date - now using Persian format
   const formatDate = (dateString: string) => {
@@ -550,24 +536,24 @@ export default function DashboardPage() {
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
                 <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" color="primary" fontWeight="bold">{getSafeNumber(activeProjects.length)}</Typography>
+                  <Typography variant="h4" color="primary" fontWeight="bold">{activeProjects.length}</Typography>
                   <Typography variant="caption" color="text.secondary">پروژه‌ها</Typography>
                 </Box>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" color="secondary" fontWeight="bold">
-                    {getSafeNumber(activeProjects.reduce((total, project) => total + getSafeNumber(project.documents, 0), 0))}
+                    {activeProjects.reduce((total, project) => total + (project.documents || 0), 0)}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">اسناد</Typography>
                 </Box>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" color="success.main" fontWeight="bold">
-                    {getSafeNumber(activeProjects.filter(p => getSafeString(p.status) === 'فعال').length)}
+                    {activeProjects.filter(p => p.status === 'فعال').length}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">فعال</Typography>
                 </Box>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" color="info.main" fontWeight="bold">
-                    {activeProjects.length > 0 ? getSafeNumber(Math.round((activeProjects.filter(p => getSafeString(p.status) === 'فعال').length / activeProjects.length) * 100)) : 0}%
+                    {activeProjects.length > 0 ? Math.round((activeProjects.filter(p => p.status === 'فعال').length / activeProjects.length) * 100) : 0}%
                   </Typography>
                   <Typography variant="caption" color="text.secondary">نرخ فعال</Typography>
                 </Box>
@@ -785,6 +771,11 @@ export default function DashboardPage() {
           </Paper>
 
         </Box>
+      </Box>
+
+      {/* Financial Dashboard Section - Bottom */}
+      <Box sx={{ mt: 4 }}>
+        <FinancialDashboard isAdmin={isAdmin} />
       </Box>
     </Box>
   );

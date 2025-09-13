@@ -12,28 +12,13 @@ export default function CompactProjectCard({ project }: CompactProjectCardProps)
   const theme = useTheme();
 
   // Safe value handling
-  const getSafeString = (val: any, defaultValue: string = ''): string => {
-    if (val === null || val === undefined) {
-      return defaultValue;
-    }
-    return String(val);
-  };
-
-  const getSafeNumber = (val: any, defaultValue: number = 0): number => {
-    if (val === null || val === undefined || isNaN(val)) {
-      return defaultValue;
-    }
-    const num = Number(val);
-    return isNaN(num) ? defaultValue : num;
-  };
-
-  const safeName = getSafeString(project.name, 'نامشخص');
-  const safeStatus = getSafeString(project.status, 'نامشخص') === 'ACTIVE' ? 'فعال' : 
-                     getSafeString(project.status, 'نامشخص') === 'ARCHIVED' ? 'آرشیو' : 
-                     getSafeString(project.status, 'نامشخص');
-  const safeDocuments = getSafeNumber(project.documents, 0);
-  const safeDescription = getSafeString(project.description, 'بدون توضیحات');
-  const safeCreatedBy = getSafeString(project.createdBy, 'نامشخص');
+  const safeName = project.name || 'نامشخص';
+  const safeStatus = project.status === 'ACTIVE' ? 'فعال' : 
+                     project.status === 'ARCHIVED' ? 'آرشیو' : 
+                     project.status || 'نامشخص';
+  const safeDocuments = project.documents || 0;
+  const safeDescription = project.description || 'بدون توضیحات';
+  const safeCreatedBy = project.createdBy || 'نامشخص';
   
   // Handle createdAt - it might be a Date object or string
   let safeCreatedAt = 'نامشخص';

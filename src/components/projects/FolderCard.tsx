@@ -28,25 +28,10 @@ export default function FolderCard({
   const theme = useTheme();
   const { isAdmin } = useAuth();
 
-  const getSafeString = (val: any, defaultValue: string = ''): string => {
-    if (val === null || val === undefined) {
-      return defaultValue;
-    }
-    return String(val);
-  };
-
-  const getSafeNumber = (val: any, defaultValue: number = 0): number => {
-    if (val === null || val === undefined || isNaN(val)) {
-      return defaultValue;
-    }
-    const num = Number(val);
-    return isNaN(num) ? defaultValue : num;
-  };
-
-  const safeName = getSafeString(folder.name, 'پوشه بدون نام');
-  const safeDescription = getSafeString(folder.description, '');
-  const safeDocuments = getSafeNumber(folder.documents, 0);
-  const safeDepth = getSafeNumber(folder.depth, 0);
+  const safeName = folder.name || 'پوشه بدون نام';
+  const safeDescription = folder.description || '';
+  const safeDocuments = folder.documents || 0;
+  const safeDepth = folder.depth || 0;
 
   return (
     <Card sx={{ 

@@ -442,18 +442,26 @@ export default function ReportsPage() {
                   <TableContainer>
                     <Table>
                       <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>کاربر</TableCell>
-                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>نقش</TableCell>
-                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>تعداد پروژه‌ها</TableCell>
-                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>تعداد اسناد</TableCell>
-                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>آخرین فعالیت</TableCell>
-                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>عملیات</TableCell>
+                        <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>کاربر</TableCell>
+                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>نقش</TableCell>
+                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>تعداد پروژه‌ها</TableCell>
+                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>تعداد اسناد</TableCell>
+                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>آخرین فعالیت</TableCell>
+                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>عملیات</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {mockReportData.userActivity.map((user, index) => (
-                          <TableRow key={index}>
+                          <TableRow 
+                            key={index}
+                            sx={{ 
+                              backgroundColor: index % 2 === 0 ? '#fafafa' : '#ffffff',
+                              '&:hover': {
+                                backgroundColor: '#f0f0f0'
+                              }
+                            }}
+                          >
                             <TableCell>
                               <Typography variant="subtitle2" fontWeight="medium" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
                                 {user.user}

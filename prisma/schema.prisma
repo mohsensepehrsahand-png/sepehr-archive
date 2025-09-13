@@ -27,12 +27,20 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Penalty settings
+  dailyPenaltyAmount Float @default(0) // مبلغ جریمه روزانه
+  penaltyGraceDays   Int   @default(0) // روزهای عفو جریمه
+
   createdProjects Project[] @relation("ProjectCreatedBy")
   createdFolders  Folder[]  @relation("FolderCreatedBy")
   createdDocuments Document[] @relation("DocumentCreatedBy")
   permissions     Permission[]
   folderPermissions FolderPermissions[]
   activities      ActivityLog[] @relation("UserActivities")
+  
+  // Financial relations
+  units            Unit[]
+  userInstallments UserInstallment[]
 }
 
 model Project {
@@ -56,6 +64,10 @@ model Project {
 
   folders     Folder[]
   documents   Document[]
+  
+  // Financial relations
+  units               Unit[]
+  installmentDefinitions InstallmentDefinition[]
 }
 
 model Folder {
@@ -244,4 +256,307 @@ enum ActivityAction {
   DELETE
   VIEW
   DOWNLOAD
+}
+
+// Financial Models
+
+model Unit {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unitNumber  String
+  area        Float    // متراژ
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  userInstallments UserInstallment[]
+  
+  @@unique([projectId, unitNumber])
+  @@index([userId])
+}
+
+model InstallmentDefinition {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  title       String   // عنوان قسط (مثلاً پروانه ساختمان)
+  dueDate     DateTime? // تاریخ سررسید (اختیاری برای اقساط پیش فرض)
+  amount      Float    // مبلغ کل قسط برای پروژه
+  isDefault   Boolean  @default(true) // آیا این قسط پیش فرض است یا مخصوص کاربر
+  order       Int      @default(0) // ترتیب نمایش قسط
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  userInstallments UserInstallment[]
+  
+  @@index([projectId])
+  @@index([projectId, order])
+}
+
+model UserInstallment {
+  id                      String   @id @default(cuid())
+  userId                  String
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unitId                  String
+  unit                    Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  installmentDefinitionId String?  // اختیاری - برای اقساط شخصی‌سازی شده null می‌شود
+  installmentDefinition   InstallmentDefinition? @relation(fields: [installmentDefinitionId], references: [id], onDelete: SetNull)
+  shareAmount             Float    // قدرالسهم کاربر از آن قسط
+  status                  InstallmentStatus @default(PENDING)
+  isCustomized            Boolean  @default(false) // آیا این قسط توسط کاربر شخصی‌سازی شده است
+  title                   String?  // عنوان شخصی‌سازی شده قسط
+  dueDate                 DateTime? // تاریخ سررسید شخصی‌سازی شده
+  order                   Int      @default(0) // ترتیب نمایش قسط
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  payments    Payment[]
+  penalties   Penalty[]
+  receipts    Receipt[]
+  
+  @@index([userId])
+  @@index([installmentDefinitionId])
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  userInstallmentId String
+  userInstallment   UserInstallment @relation(fields: [userInstallmentId], references: [id], onDelete: Cascade)
+  paymentDate       DateTime
+  amount            Float
+  description       String?
+  receiptImagePath  String?  // مسیر تصویر فیش پرداخت
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userInstallmentId])
+  @@index([paymentDate])
+}
+
+model Receipt {
+  id                String   @id @default(cuid())
+  userInstallmentId String
+  userInstallment   UserInstallment @relation(fields: [userInstallmentId], references: [id], onDelete: Cascade)
+  receiptNumber     String   // شماره فیش (auto-increment)
+  amount            Float    @default(0) // مبلغ فیش
+  receiptDate       DateTime? // تاریخ فیش
+  description       String?  // توضیحات
+  receiptImagePath  String?  // مسیر تصویر فیش
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userInstallmentId])
+  @@index([receiptNumber])
+}
+
+
+model Penalty {
+  id                String   @id @default(cuid())
+  userInstallmentId String
+  userInstallment   UserInstallment @relation(fields: [userInstallmentId], references: [id], onDelete: Cascade)
+  daysLate          Int      // روزهای تأخیر
+  dailyRate         Float    // نرخ جریمه روزانه
+  totalPenalty      Float    // مبلغ کل جریمه
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userInstallmentId])
+}
+
+// Financial Enums
+enum InstallmentStatus {
+  PENDING    // در انتظار پرداخت
+  PARTIAL    // بخشی پرداخت شده
+  PAID       // پرداخت شده
+  OVERDUE    // معوق
+}
+
+// Archived Models
+
+model ArchivedUser {
+  id                  String   @id @default(cuid())
+  originalUserId      String
+  username            String
+  firstName           String?
+  lastName            String?
+  email               String?
+  role                Role
+  dailyPenaltyAmount  Float
+  penaltyGraceDays    Int
+  archivedAt          DateTime @default(now())
+
+  archivedUnits       ArchivedUnit[]
+  archivedUserInstallments ArchivedUserInstallment[]
+
+  @@index([username])
+  @@index([archivedAt])
+}
+
+model ArchivedUnit {
+  id              String   @id @default(cuid())
+  archivedUserId  String
+  archivedUser    ArchivedUser @relation(fields: [archivedUserId], references: [id], onDelete: Cascade)
+  projectId       String
+  projectName     String
+  unitNumber      String
+  area            Float
+  archivedAt      DateTime @default(now())
+
+  archivedUserInstallments ArchivedUserInstallment[]
+
+  @@index([archivedUserId])
+  @@index([projectId])
+}
+
+model ArchivedUserInstallment {
+  id                        String   @id @default(cuid())
+  archivedUserId            String
+  archivedUser              ArchivedUser @relation(fields: [archivedUserId], references: [id], onDelete: Cascade)
+  archivedUnitId            String?
+  archivedUnit              ArchivedUnit? @relation(fields: [archivedUnitId], references: [id], onDelete: Cascade)
+  installmentDefinitionId   String?
+  installmentTitle          String
+  shareAmount               Float
+  status                    InstallmentStatus
+  archivedAt                DateTime @default(now())
+
+  archivedPayments          ArchivedPayment[]
+  archivedPenalties         ArchivedPenalty[]
+
+  @@index([archivedUserId])
+  @@index([archivedUnitId])
+  @@index([installmentDefinitionId])
+}
+
+model ArchivedPayment {
+  id                        String   @id @default(cuid())
+  archivedUserInstallmentId String
+  archivedUserInstallment   ArchivedUserInstallment @relation(fields: [archivedUserInstallmentId], references: [id], onDelete: Cascade)
+  paymentDate               DateTime
+  amount                    Float
+  description               String?
+  archivedAt                DateTime @default(now())
+
+  @@index([archivedUserInstallmentId])
+  @@index([paymentDate])
+}
+
+model ArchivedPenalty {
+  id                        String   @id @default(cuid())
+  archivedUserInstallmentId String
+  archivedUserInstallment   ArchivedUserInstallment @relation(fields: [archivedUserInstallmentId], references: [id], onDelete: Cascade)
+  daysLate                  Int
+  dailyRate                 Float
+  totalPenalty              Float
+  archivedAt                DateTime @default(now())
+
+  @@index([archivedUserInstallmentId])
+}
+
+// Archived Project Models
+
+model ArchivedProject {
+  id                  String   @id @default(cuid())
+  originalProjectId   String
+  name                String
+  description         String?
+  status              ProjectStatus
+  colorPrimary        String
+  colorFolderDefault  String
+  colorDocImage       String
+  colorDocPdf         String
+  bgColor             String
+  createdBy           String
+  createdByUsername   String
+  archivedAt          DateTime @default(now())
+
+  folders             ArchivedFolder[]
+  documents           ArchivedDocument[]
+  units               ArchivedProjectUnit[]
+  installmentDefinitions ArchivedProjectInstallmentDefinition[]
+
+  @@index([originalProjectId])
+  @@index([archivedAt])
+}
+
+model ArchivedFolder {
+  id                  String   @id @default(cuid())
+  archivedProjectId   String
+  archivedProject     ArchivedProject @relation(fields: [archivedProjectId], references: [id], onDelete: Cascade)
+  parentId            String?
+  parent              ArchivedFolder? @relation("ArchivedFolderToChildren", fields: [parentId], references: [id])
+  children            ArchivedFolder[] @relation("ArchivedFolderToChildren")
+  name                String
+  description         String?
+  tabKey              TabKey
+  path                String
+  depth               Int
+  sortOrder           Int       @default(0)
+  createdBy           String
+  createdByUsername   String
+  archivedAt          DateTime @default(now())
+
+  documents           ArchivedDocument[]
+
+  @@index([archivedProjectId, path])
+}
+
+model ArchivedDocument {
+  id                  String   @id @default(cuid())
+  archivedProjectId   String
+  archivedProject     ArchivedProject @relation(fields: [archivedProjectId], references: [id], onDelete: Cascade)
+  archivedFolderId    String?
+  archivedFolder      ArchivedFolder? @relation(fields: [archivedFolderId], references: [id], onDelete: Cascade)
+  name                String
+  description         String?
+  tagsJson            String    @default("[]")
+  mimeType            String
+  fileExt             String
+  sizeBytes           Int
+  isUserUploaded      Boolean   @default(false)
+  createdBy           String
+  createdByUsername   String
+  filePath            String
+  archivedAt          DateTime @default(now())
+
+  @@index([archivedProjectId, archivedFolderId])
+}
+
+model ArchivedProjectUnit {
+  id                  String   @id @default(cuid())
+  archivedProjectId   String
+  archivedProject     ArchivedProject @relation(fields: [archivedProjectId], references: [id], onDelete: Cascade)
+  userId              String
+  userUsername        String
+  userFirstName       String?
+  userLastName        String?
+  unitNumber          String
+  area                Float
+  archivedAt          DateTime @default(now())
+
+  @@index([archivedProjectId])
+  @@index([userId])
+}
+
+model ArchivedProjectInstallmentDefinition {
+  id                  String   @id @default(cuid())
+  archivedProjectId   String
+  archivedProject     ArchivedProject @relation(fields: [archivedProjectId], references: [id], onDelete: Cascade)
+  title               String
+  dueDate             DateTime?
+  amount              Float
+  isDefault           Boolean  @default(true)
+  order               Int      @default(0)
+  archivedAt          DateTime @default(now())
+
+  @@index([archivedProjectId])
+  @@index([archivedProjectId, order])
 }

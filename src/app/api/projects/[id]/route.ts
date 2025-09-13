@@ -141,8 +141,29 @@ export async function DELETE(
     const project = await prisma.project.findUnique({
       where: { id },
       include: {
-        folders: true,
-        documents: true
+        folders: {
+          include: {
+            documents: true
+          }
+        },
+        documents: true,
+        createdByUser: {
+          select: {
+            username: true
+          }
+        },
+        units: {
+          include: {
+            user: {
+              select: {
+                username: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        },
+        installmentDefinitions: true
       }
     });
 
@@ -167,27 +188,108 @@ export async function DELETE(
           message: `این پروژه شامل ${project.folders.length} پوشه و ${project.documents.length} سند است. آیا مطمئن هستید که می‌خواهید آن را حذف کنید؟`
         }, { status: 409 }); // Conflict status for content confirmation
       }
-      
-      // Force delete: Delete all documents first
-      await prisma.document.deleteMany({
-        where: { projectId: id }
-      });
+    }
 
-      // Delete all folders
-      await prisma.folder.deleteMany({
-        where: { projectId: id }
-      });
-
-      // Delete physical files and directories
-      try {
-        const projectUploadDir = join(process.cwd(), 'uploads', id);
-        if (existsSync(projectUploadDir)) {
-          await deleteDirectoryRecursive(projectUploadDir);
-        }
-      } catch (fileError) {
-        console.error('Error deleting physical files:', fileError);
-        // Continue with database deletion even if file deletion fails
+    // Archive project before deletion
+    const archivedProject = await prisma.archivedProject.create({
+      data: {
+        originalProjectId: project.id,
+        name: project.name,
+        description: project.description,
+        status: project.status,
+        colorPrimary: project.colorPrimary,
+        colorFolderDefault: project.colorFolderDefault,
+        colorDocImage: project.colorDocImage,
+        colorDocPdf: project.colorDocPdf,
+        bgColor: project.bgColor,
+        createdBy: project.createdBy,
+        createdByUsername: project.createdByUser?.username || 'نامشخص'
       }
+    });
+
+    // Archive folders
+    for (const folder of project.folders) {
+      const archivedFolder = await prisma.archivedFolder.create({
+        data: {
+          archivedProjectId: archivedProject.id,
+          parentId: folder.parentId,
+          name: folder.name,
+          description: folder.description,
+          tabKey: folder.tabKey,
+          path: folder.path,
+          depth: folder.depth,
+          sortOrder: folder.sortOrder,
+          createdBy: folder.createdBy,
+          createdByUsername: 'نامشخص' // We'll need to get this from user data
+        }
+      });
+
+      // Archive documents in this folder
+      for (const document of folder.documents) {
+        await prisma.archivedDocument.create({
+          data: {
+            archivedProjectId: archivedProject.id,
+            archivedFolderId: archivedFolder.id,
+            name: document.name,
+            description: document.description,
+            tagsJson: document.tagsJson,
+            mimeType: document.mimeType,
+            fileExt: document.fileExt,
+            sizeBytes: document.sizeBytes,
+            isUserUploaded: document.isUserUploaded,
+            createdBy: document.createdBy,
+            createdByUsername: 'نامشخص',
+            filePath: document.filePath
+          }
+        });
+      }
+    }
+
+    // Archive root level documents
+    for (const document of project.documents) {
+      await prisma.archivedDocument.create({
+        data: {
+          archivedProjectId: archivedProject.id,
+          name: document.name,
+          description: document.description,
+          tagsJson: document.tagsJson,
+          mimeType: document.mimeType,
+          fileExt: document.fileExt,
+          sizeBytes: document.sizeBytes,
+          isUserUploaded: document.isUserUploaded,
+          createdBy: document.createdBy,
+          createdByUsername: 'نامشخص',
+          filePath: document.filePath
+        }
+      });
+    }
+
+    // Archive units
+    for (const unit of project.units) {
+      await prisma.archivedProjectUnit.create({
+        data: {
+          archivedProjectId: archivedProject.id,
+          userId: unit.userId,
+          userUsername: unit.user.username,
+          userFirstName: unit.user.firstName,
+          userLastName: unit.user.lastName,
+          unitNumber: unit.unitNumber,
+          area: unit.area
+        }
+      });
+    }
+
+    // Archive installment definitions
+    for (const installmentDef of project.installmentDefinitions) {
+      await prisma.archivedProjectInstallmentDefinition.create({
+        data: {
+          archivedProjectId: archivedProject.id,
+          title: installmentDef.title,
+          dueDate: installmentDef.dueDate,
+          amount: installmentDef.amount,
+          isDefault: installmentDef.isDefault
+        }
+      });
     }
 
     // Log the deletion activity before deleting
@@ -198,21 +300,26 @@ export async function DELETE(
         resourceType: 'PROJECT',
         resourceId: id,
         resourceName: project.name,
-        description: `پروژه "${project.name}" حذف شد`,
+        description: `پروژه "${project.name}" حذف شد و در آرشیو نگهداری شد`,
         metadata: {
           foldersCount: project.folders.length,
           documentsCount: project.documents.length,
-          forceDelete
+          archived: true
         }
       });
     }
 
-    // Delete project from database
+    // Delete project from database (cascade delete will handle related data)
+    console.log('🗑️ Deleting project:', id);
     await prisma.project.delete({
       where: { id }
     });
+    console.log('✅ Project deleted successfully');
 
-    return NextResponse.json({ message: 'پروژه با موفقیت حذف شد' });
+    return NextResponse.json({ 
+      message: 'پروژه با موفقیت حذف شد و در آرشیو نگهداری شد',
+      archivedProjectId: archivedProject.id
+    });
   } catch (error) {
     console.error('Error deleting project:', error);
     return NextResponse.json(

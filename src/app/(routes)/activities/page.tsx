@@ -518,12 +518,14 @@ export default function ActivitiesPage() {
               component={Link}
               href="/dashboard"
               variant="outlined"
-              startIcon={<ArrowBack />}
+              startIcon={<ArrowBack sx={{ transform: 'rotate(180deg)' }} />}
               size="small"
               sx={{ 
                 borderRadius: 2, 
                 px: 2,
-                fontFamily: 'Vazirmatn, Arial, sans-serif'
+                fontFamily: 'Vazirmatn, Arial, sans-serif',
+                direction: 'rtl',
+                '& .MuiButton-startIcon': { ml: 1 }
               }}
             >
               بازگشت

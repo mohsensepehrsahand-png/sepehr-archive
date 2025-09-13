@@ -16,12 +16,10 @@ import {
   Folder,
   CloudUpload,
   Settings,
-  Person,
-  CalendarToday,
   Archive,
   AdminPanelSettings,
-  Security,
-  History
+  History,
+  AccountBalance
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -32,6 +30,7 @@ const sidebarWidth = 280;
 const mainMenuItems = [
   { text: "داشبورد", icon: <Dashboard />, href: "/dashboard" },
   { text: "پروژه‌ها", icon: <Folder />, href: "/projects" },
+  { text: "محاسبات مالی", icon: <AccountBalance />, href: "/finance" },
   { text: "آرشیو شده‌ها", icon: <Archive />, href: "/archived" },
   { text: "آپلود اسناد", icon: <CloudUpload />, href: "/upload" },
 ];
@@ -46,6 +45,7 @@ const adminMenuItems = [
 // منوی محدود برای کاربران غیر ادمین
 const userMenuItems = [
   { text: "پروژه‌ها", icon: <Folder />, href: "/projects" },
+  { text: "محاسبات مالی", icon: <AccountBalance />, href: "/finance" },
 ];
 
 export default function Sidebar() {

@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { addProjectEventListener, PROJECT_EVENTS } from '@/lib/events';
 
 export interface Project {
   id: string;
@@ -52,6 +53,32 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   // Fetch projects on component mount
   useEffect(() => {
     fetchProjects();
+  }, []);
+
+  // Listen for project events
+  useEffect(() => {
+    const removeRestoredListener = addProjectEventListener('RESTORED', () => {
+      fetchProjects();
+    });
+
+    const removeCreatedListener = addProjectEventListener('CREATED', () => {
+      fetchProjects();
+    });
+
+    const removeUpdatedListener = addProjectEventListener('UPDATED', () => {
+      fetchProjects();
+    });
+
+    const removeDeletedListener = addProjectEventListener('DELETED', () => {
+      fetchProjects();
+    });
+
+    return () => {
+      removeRestoredListener();
+      removeCreatedListener();
+      removeUpdatedListener();
+      removeDeletedListener();
+    };
   }, []);
 
   const fetchProjects = async () => {

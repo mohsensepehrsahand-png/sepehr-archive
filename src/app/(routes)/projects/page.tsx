@@ -45,6 +45,7 @@ import Link from "next/link";
 import { useProjects } from "@/contexts/ProjectContext";
 import type { Project } from "@/contexts/ProjectContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { dispatchProjectEvent } from "@/lib/events";
 import MobileProjectCard from "@/components/mobile/MobileProjectCard";
 import DesktopProjectCard from "@/components/projects/DesktopProjectCard";
 import MobileSearchBar from "@/components/mobile/MobileSearchBar";
@@ -119,39 +120,25 @@ export default function ProjectListPage() {
   };
 
   const handleDeleteProject = async (projectId: string, projectName: string) => {
-    try {
-      await deleteProject(projectId);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('hasContent')) {
+    const confirmMessage = `آیا مطمئن هستید که می‌خواهید پروژه "${projectName}" را حذف کنید؟\n\nاین پروژه به آرشیو منتقل خواهد شد و قابل بازگردانی است.`;
+    
+    showConfirmationDialog(
+      "تایید حذف پروژه",
+      confirmMessage,
+      async () => {
+        setConfirmationLoading(true);
         try {
-          const contentInfo = JSON.parse(error.message);
-          const confirmMessage = `${contentInfo.message}\n\nاین عملیات غیرقابل بازگشت است. آیا مطمئن هستید؟`;
-          
-          showConfirmationDialog(
-            "تایید حذف پروژه",
-            confirmMessage,
-            async () => {
-              setConfirmationLoading(true);
-              try {
-                await deleteProject(projectId, true);
-                hideConfirmationDialog();
-              } catch (deleteError) {
-                console.error('Error force deleting project:', deleteError);
-                alert('خطا در حذف پروژه');
-              } finally {
-                setConfirmationLoading(false);
-              }
-            }
-          );
-        } catch (parseError) {
-          console.error('Error parsing content info:', parseError);
+          await deleteProject(projectId, true);
+          dispatchProjectEvent('DELETED', { projectId, projectName });
+          hideConfirmationDialog();
+        } catch (deleteError) {
+          console.error('Error deleting project:', deleteError);
           alert('خطا در حذف پروژه');
+        } finally {
+          setConfirmationLoading(false);
         }
-      } else {
-        console.error('Error deleting project:', error);
-        alert('خطا در حذف پروژه');
       }
-    }
+    );
   };
 
   const handleEditProject = (project: Project) => {

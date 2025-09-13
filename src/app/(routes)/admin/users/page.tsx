@@ -235,24 +235,46 @@ export default function UsersPage() {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (confirm("آیا از حذف این کاربر اطمینان دارید؟")) {
-      try {
-        const response = await fetch(`/api/users/${id}`, {
-          method: 'DELETE',
-        });
+    try {
+      // بررسی وجود اطلاعات مالی قبل از حذف
+      const userResponse = await fetch(`/api/users/${id}`);
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        
+        let confirmMessage = "آیا از حذف این کاربر اطمینان دارید؟";
+        if (userData.hasFinancialData) {
+          confirmMessage = `کاربر "${userData.user.firstName} ${userData.user.lastName}" دارای اطلاعات مالی است:
+          
+• ${userData.financialDataCount.units} واحد
+• ${userData.financialDataCount.installments} قسط
 
-        if (response.ok) {
-          setUsers(users.filter(u => u.id !== id));
-          showSnackbar("کاربر با موفقیت حذف شد", "success");
-          // بروزرسانی خودکار لیست کاربران
-          setTimeout(() => fetchUsers(), 500);
-        } else {
-          showSnackbar("خطا در حذف کاربر", "error");
+در صورت حذف، اطلاعات مالی در بخش آرشیو نگهداری خواهد شد.
+
+آیا از حذف این کاربر اطمینان دارید؟`;
         }
-      } catch (error) {
-        console.error('Error deleting user:', error);
-        showSnackbar("خطا در حذف کاربر", "error");
+
+        if (confirm(confirmMessage)) {
+          const response = await fetch(`/api/users/${id}`, {
+            method: 'DELETE',
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            setUsers(users.filter(u => u.id !== id));
+            showSnackbar(result.message, "success");
+            // بروزرسانی خودکار لیست کاربران
+            setTimeout(() => fetchUsers(), 500);
+          } else {
+            const error = await response.json();
+            showSnackbar(error.error || "خطا در حذف کاربر", "error");
+          }
+        }
+      } else {
+        showSnackbar("خطا در بررسی اطلاعات کاربر", "error");
       }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      showSnackbar("خطا در حذف کاربر", "error");
     }
   };
 
@@ -651,7 +673,7 @@ export default function UsersPage() {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.50' }}>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                 <TableCell padding="checkbox">
                   <Checkbox
                     indeterminate={selectedUsers.length > 0 && selectedUsers.length < paginatedUsers.length}
@@ -747,8 +769,17 @@ export default function UsersPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedUsers.map((user) => (
-                  <TableRow key={user.id} hover>
+                paginatedUsers.map((user, index) => (
+                  <TableRow 
+                    key={user.id} 
+                    hover
+                    sx={{ 
+                      backgroundColor: index % 2 === 0 ? '#fafafa' : '#ffffff',
+                      '&:hover': {
+                        backgroundColor: '#f0f0f0'
+                      }
+                    }}
+                  >
                     <TableCell padding="checkbox">
                       <Checkbox
                         checked={selectedUsers.includes(user.id)}

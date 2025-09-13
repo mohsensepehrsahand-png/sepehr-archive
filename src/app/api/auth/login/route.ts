@@ -283,11 +283,39 @@ export async function POST(request: NextRequest) {
     // حذف رمز عبور از پاسخ
     const { passwordHash, ...userWithoutPassword } = user;
 
-    return NextResponse.json({
+    // ایجاد response با کوکی‌ها
+    const response = NextResponse.json({
       success: true,
       user: userWithoutPassword,
       message: 'ورود موفقیت‌آمیز'
     });
+
+    // تنظیم کوکی‌ها
+    response.cookies.set('authToken', 'user-token', {
+      maxAge: 60 * 60 * 24 * 7, // 7 روز
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'lax'
+    });
+
+    response.cookies.set('userRole', user.role, {
+      maxAge: 60 * 60 * 24 * 7, // 7 روز
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'lax'
+    });
+
+    response.cookies.set('userData', JSON.stringify(userWithoutPassword), {
+      maxAge: 60 * 60 * 24 * 7, // 7 روز
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'lax'
+    });
+
+    return response;
 
   } catch (error) {
     console.error('Login error:', error);
