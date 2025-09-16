@@ -13,20 +13,6 @@ export const formatPersianDate = (dateString: string | Date): string => {
   return new Intl.DateTimeFormat('fa-IR', options).format(date);
 };
 
-export const formatPersianDateTime = (dateString: string | Date): string => {
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-  
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    calendar: 'persian'
-  };
-  
-  return new Intl.DateTimeFormat('fa-IR', options).format(date);
-};
 
 export const formatPersianDateShort = (dateString: string | Date): string => {
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString;

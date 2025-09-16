@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/app/api/_lib/db";
 
 export interface ActivityLogData {
   userId: string;

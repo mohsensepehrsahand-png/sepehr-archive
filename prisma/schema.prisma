@@ -68,6 +68,19 @@ model Project {
   // Financial relations
   units               Unit[]
   installmentDefinitions InstallmentDefinition[]
+  
+  // Accounting relations
+  accounts            Account[]
+  accountGroups       AccountGroup[]
+  accountClasses      AccountClass[]
+  accountSubClasses   AccountSubClass[]
+  accountDetails      AccountDetail[]
+  transactions        Transaction[]
+  invoices            Invoice[]
+  bills               Bill[]
+  ledgers             Ledger[]
+  banks               Bank[]
+  accountingDocuments AccountingDocument[]
 }
 
 model Folder {
@@ -124,6 +137,11 @@ model Document {
 
   // Future: multiple versions
   versions    DocumentVersion[]
+  
+  // Accounting relations
+  transactions Transaction[]
+  invoices     Invoice[]
+  bills        Bill[]
 
   @@index([projectId, folderId])
   @@index([isUserUploaded])
@@ -461,6 +479,304 @@ model ArchivedPenalty {
   @@index([archivedUserInstallmentId])
 }
 
+// Accounting Models
+
+model AccountGroup {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code        String   // کد گروه (1 رقم: 1, 2, 3, ...)
+  name        String   // نام گروه (مثل: دارایی‌های جاری)
+  isDefault   Boolean  @default(false) // آیا گروه پیش‌فرض است
+  isProtected Boolean  @default(false) // آیا قابل حذف است
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  classes     AccountClass[]
+  
+  @@unique([projectId, code])
+  @@index([projectId])
+  @@index([projectId, sortOrder])
+}
+
+model AccountClass {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  groupId     String
+  group       AccountGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  code        String   // کد کل (2 رقم: 01, 02, 03, ...)
+  name        String   // نام کل (مثل: صندوق)
+  nature      AccountNature // ماهیت حساب
+  isDefault   Boolean  @default(false)
+  isProtected Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  subClasses  AccountSubClass[]
+  
+  @@unique([projectId, groupId, code])
+  @@index([projectId])
+  @@index([groupId])
+  @@index([projectId, groupId, sortOrder])
+}
+
+model AccountSubClass {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  classId     String
+  class       AccountClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  code        String   // کد معین (3 رقم: 001, 002, 003, ...)
+  name        String   // نام معین (مثل: صندوق دفتر مرکزی)
+  hasDetails  Boolean  @default(false) // آیا دارای تفصیلی است
+  isDefault   Boolean  @default(false)
+  isProtected Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  details     AccountDetail[]
+  
+  @@unique([projectId, classId, code])
+  @@index([projectId])
+  @@index([classId])
+  @@index([projectId, classId, sortOrder])
+}
+
+model AccountDetail {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subClassId  String
+  subClass    AccountSubClass @relation(fields: [subClassId], references: [id], onDelete: Cascade)
+  code        String   // کد تفصیلی (3 رقم: 001, 002, 003, ...)
+  name        String   // نام تفصیلی (مثل: صندوق پروژه A)
+  description String?  // توضیحات اضافی
+  isDefault   Boolean  @default(false)
+  isProtected Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // ارتباط با حساب اصلی برای تراکنش‌ها
+  accounts    Account[]
+  
+  @@unique([projectId, subClassId, code])
+  @@index([projectId])
+  @@index([subClassId])
+  @@index([projectId, subClassId, sortOrder])
+}
+
+model Account {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  detailId    String?  // ارتباط با کد تفصیلی
+  detail      AccountDetail? @relation(fields: [detailId], references: [id], onDelete: SetNull)
+  name        String
+  code        String   @default("") // کد کامل حساب (مثل 101001001)
+  type        AccountType
+  level       Int      @default(1) // سطح حساب (1-4)
+  parentId    String?  // حساب والد برای ساختار سلسله‌مراتبی
+  parent      Account? @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Account[] @relation("AccountHierarchy")
+  contact     String?  // اطلاعات تماس
+  description String?
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  transactions Transaction[]
+  invoices     Invoice[]
+  bills        Bill[]
+  ledgers      Ledger[]
+  
+  @@index([projectId])
+  @@index([projectId, type])
+  @@index([projectId, code])
+  @@index([parentId])
+  @@index([detailId])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  date        DateTime
+  amount      Float
+  type        TransactionType
+  journalType JournalType
+  description String?
+  documentId  String?  // ارتباط با سند آرشیو
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([projectId])
+  @@index([projectId, date])
+  @@index([accountId])
+  @@index([journalType])
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  date        DateTime
+  totalAmount Float
+  status      InvoiceStatus @default(UNPAID)
+  description String?
+  documentId  String?  // ارتباط با سند آرشیو
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([projectId])
+  @@index([projectId, date])
+  @@index([accountId])
+  @@index([status])
+}
+
+model Bill {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  date        DateTime
+  totalAmount Float
+  status      InvoiceStatus @default(UNPAID)
+  description String?
+  documentId  String?  // ارتباط با سند آرشیو
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([projectId])
+  @@index([projectId, date])
+  @@index([accountId])
+  @@index([status])
+}
+
+model Ledger {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  balance     Float    @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([projectId, accountId])
+  @@index([projectId])
+  @@index([accountId])
+}
+
+// Accounting Enums
+enum AccountType {
+  CUSTOMER    // مشتری
+  CONTRACTOR  // پیمانکار
+  SUPPLIER    // تأمین‌کننده
+  EXPENSE     // هزینه
+  INCOME      // درآمد
+  ASSET       // دارایی
+  LIABILITY   // بدهی
+  EQUITY      // سرمایه
+}
+
+enum AccountNature {
+  DEBIT           // بدهکار
+  CREDIT          // بستانکار
+  DEBIT_CREDIT    // بدهکار–بستانکار
+}
+
+enum TransactionType {
+  DEBIT   // بدهکار
+  CREDIT  // بستانکار
+}
+
+enum JournalType {
+  DAYBOOK        // دفتر روزنامه
+  GENERAL_LEDGER // دفتر کل
+  SUBSIDIARY     // دفتر معین
+}
+
+enum InvoiceStatus {
+  PAID     // پرداخت شده
+  PARTIAL  // بخشی
+  UNPAID   // معوق
+}
+
+enum DocumentStatus {
+  TEMPORARY // موقت
+  PERMANENT // دائم
+}
+
+// Bank Models
+model Bank {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String   // نام بانک
+  branch      String?  // شعبه
+  accountNumber String // شماره حساب
+  accountName   String // نام صاحب حساب
+  balance     Float    @default(0) // موجودی
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  transactions BankTransaction[]
+  
+  @@index([projectId])
+}
+
+model BankTransaction {
+  id          String   @id @default(cuid())
+  bankId      String
+  bank        Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  type        BankTransactionType
+  amount      Float
+  description String?
+  reference   String?  // شماره مرجع
+  date        DateTime
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([bankId])
+  @@index([date])
+}
+
+enum BankTransactionType {
+  DEPOSIT    // واریز
+  WITHDRAWAL // برداشت
+  TRANSFER   // انتقال
+  RECONCILE  // تطبیق
+}
+
 // Archived Project Models
 
 model ArchivedProject {
@@ -559,4 +875,42 @@ model ArchivedProjectInstallmentDefinition {
 
   @@index([archivedProjectId])
   @@index([archivedProjectId, order])
+}
+
+// Accounting Document Models
+model AccountingDocument {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentNumber  String
+  documentDate    DateTime
+  description     String?
+  totalDebit      Float    @default(0)
+  totalCredit     Float    @default(0)
+  status          DocumentStatus @default(TEMPORARY)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  entries         AccountingEntry[]
+
+  @@index([projectId])
+  @@index([projectId, documentNumber])
+  @@index([documentDate])
+  @@index([status])
+}
+
+model AccountingEntry {
+  id              String   @id @default(cuid())
+  documentId      String
+  document        AccountingDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  accountCode     String
+  accountName     String
+  description     String?
+  debit           Float    @default(0)
+  credit          Float    @default(0)
+  accountNature   AccountNature?
+  createdAt       DateTime @default(now())
+
+  @@index([documentId])
+  @@index([accountCode])
 }

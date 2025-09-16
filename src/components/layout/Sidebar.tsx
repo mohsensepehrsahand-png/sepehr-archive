@@ -19,11 +19,13 @@ import {
   Archive,
   AdminPanelSettings,
   History,
-  AccountBalance
+  AccountBalance,
+  Calculate
 } from "@mui/icons-material";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 const sidebarWidth = 280;
 
@@ -31,6 +33,7 @@ const mainMenuItems = [
   { text: "داشبورد", icon: <Dashboard />, href: "/dashboard" },
   { text: "پروژه‌ها", icon: <Folder />, href: "/projects" },
   { text: "محاسبات مالی", icon: <AccountBalance />, href: "/finance" },
+  { text: "حسابداری", icon: <Calculate />, href: "/accounting" },
   { text: "آرشیو شده‌ها", icon: <Archive />, href: "/archived" },
   { text: "آپلود اسناد", icon: <CloudUpload />, href: "/upload" },
 ];
@@ -50,10 +53,48 @@ const userMenuItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, isAdmin } = useAuth();
 
   // انتخاب منوی مناسب بر اساس نقش کاربر
   const menuItems = isAdmin ? mainMenuItems : userMenuItems;
+
+  // Prefetch data when hovering over menu items
+  const handleMouseEnter = (href: string) => {
+    router.prefetch(href);
+    
+    // Prefetch related data
+    if (href === "/dashboard") {
+      queryClient.prefetchQuery({
+        queryKey: ["dashboard"],
+        queryFn: async () => {
+          const [activitiesRes, documentsRes, projectsRes] = await Promise.all([
+            fetch("/api/dashboard/recent-activities"),
+            fetch("/api/dashboard/recent-documents"),
+            fetch("/api/projects")
+          ]);
+          const [activities, documents, projects] = await Promise.all([
+            activitiesRes.ok ? activitiesRes.json() : [],
+            documentsRes.ok ? documentsRes.json() : [],
+            projectsRes.ok ? projectsRes.json() : []
+          ]);
+          return { activities, documents, projects };
+        },
+        staleTime: 1 * 60 * 1000,
+      });
+    } else if (href === "/projects") {
+      queryClient.prefetchQuery({
+        queryKey: ["projects"],
+        queryFn: async () => {
+          const response = await fetch("/api/projects");
+          if (!response.ok) throw new Error("Failed to fetch projects");
+          return response.json();
+        },
+        staleTime: 2 * 60 * 1000,
+      });
+    }
+  };
 
   const renderMenuItem = (item: any, index: number) => (
     <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
@@ -61,6 +102,7 @@ export default function Sidebar() {
         component={Link}
         href={item.href}
         selected={pathname === item.href}
+        onMouseEnter={() => handleMouseEnter(item.href)}
         sx={{
           borderRadius: 2,
           mx: 1,

@@ -27,13 +27,13 @@ async function createAdminUser() {
     console.log('👤 ایجاد کاربر admin جدید...');
     
     // Hash password
-    const hashedPassword = await bcrypt.hash('admin123', 12);
+    const hashedPassword = await bcrypt.hash('admin', 12);
     
     // Create admin user
     const adminUser = await prisma.user.create({
       data: {
         username: 'admin',
-        password: hashedPassword,
+        passwordHash: hashedPassword,
         firstName: 'مدیر',
         lastName: 'سیستم',
         email: 'admin@sepehr-archive.com',
@@ -44,14 +44,14 @@ async function createAdminUser() {
 
     console.log('✅ کاربر admin با موفقیت ایجاد شد:');
     console.log(`   نام کاربری: ${adminUser.username}`);
-    console.log(`   رمز عبور: admin123`);
+    console.log(`   رمز عبور: admin`);
     console.log(`   نقش: ${adminUser.role}`);
     console.log(`   ایمیل: ${adminUser.email}`);
     console.log(`   وضعیت: ${adminUser.isActive ? 'فعال' : 'غیرفعال'}`);
     console.log('');
     console.log('🔑 اطلاعات ورود:');
     console.log('   نام کاربری: admin');
-    console.log('   رمز عبور: admin123');
+    console.log('   رمز عبور: admin');
     
   } catch (error) {
     console.error('❌ خطا در ایجاد کاربر admin:', error);

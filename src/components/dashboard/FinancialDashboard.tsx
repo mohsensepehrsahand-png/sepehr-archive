@@ -124,7 +124,7 @@ export default function FinancialDashboard({ isAdmin }: FinancialDashboardProps)
     <Box sx={{ mb: 4 }}>
       <Grid container spacing={2}>
         {/* Financial Summary Cards */}
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Paper sx={{ p: 2, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <AccountBalance sx={{ color: 'primary.main', fontSize: 20 }} />
@@ -134,7 +134,7 @@ export default function FinancialDashboard({ isAdmin }: FinancialDashboardProps)
             </Box>
             
             <Grid container spacing={2}>
-              <Grid item xs={6} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <SummaryCard
                   title="کل پروژه‌ها"
                   amount={financialData.totalProjects}
@@ -142,7 +142,7 @@ export default function FinancialDashboard({ isAdmin }: FinancialDashboardProps)
                   icon="📊"
                 />
               </Grid>
-              <Grid item xs={6} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <SummaryCard
                   title="کل مبلغ"
                   amount={financialData.totalAmount}
@@ -150,7 +150,7 @@ export default function FinancialDashboard({ isAdmin }: FinancialDashboardProps)
                   icon="💰"
                 />
               </Grid>
-              <Grid item xs={6} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <SummaryCard
                   title="پرداخت شده"
                   amount={financialData.paidAmount}
@@ -158,7 +158,7 @@ export default function FinancialDashboard({ isAdmin }: FinancialDashboardProps)
                   icon="✅"
                 />
               </Grid>
-              <Grid item xs={6} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <SummaryCard
                   title="باقی‌مانده"
                   amount={financialData.remainingAmount}
@@ -171,7 +171,7 @@ export default function FinancialDashboard({ isAdmin }: FinancialDashboardProps)
         </Grid>
 
         {/* Project Payment Progress */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Paper sx={{ p: 2, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <Timeline sx={{ color: 'primary.main', fontSize: 20 }} />

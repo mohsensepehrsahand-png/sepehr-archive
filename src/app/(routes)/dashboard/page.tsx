@@ -11,21 +11,22 @@ import { useRouter } from "next/navigation";
 import CompactProjectCard from "@/components/dashboard/CompactProjectCard";
 import FinancialDashboard from "@/components/dashboard/FinancialDashboard";
 import { formatPersianDate, formatRelativeTime } from "@/utils/dateUtils";
+import { useDashboardData } from "@/hooks/useDashboard";
+import { DashboardSkeleton } from "@/components/common/LoadingSkeleton";
 
 
 export default function DashboardPage() {
   const { isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const { projects, addProject } = useProjects();
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
-  const [recentDocuments, setRecentDocuments] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const theme = useTheme();
+  
+  // Use React Query for dashboard data
+  const { data: dashboardData, isLoading, error, refetch } = useDashboardData();
   
   // Filter out archived projects for dashboard
   const activeProjects = projects.filter(project => project.status !== 'آرشیو' && project.status !== 'ARCHIVED');
@@ -42,51 +43,9 @@ export default function DashboardPage() {
     }
   }, [isAdmin, authLoading, router]);
 
-  // Function to fetch dashboard data
-  const fetchDashboardData = async (showLoading = false) => {
-    try {
-      if (showLoading) {
-        setIsRefreshing(true);
-      }
-      
-      // Add cache busting parameter - only on client side
-      const timestamp = typeof window !== 'undefined' ? Date.now() : 0;
-      
-      // Fetch recent activities
-      const activitiesResponse = await fetch(`/api/dashboard/recent-activities?t=${timestamp}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      if (activitiesResponse.ok) {
-        const activities = await activitiesResponse.json();
-        setRecentActivities(activities);
-      }
-
-      // Fetch recent documents
-      const documentsResponse = await fetch(`/api/dashboard/recent-documents?t=${timestamp}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      if (documentsResponse.ok) {
-        const documents = await documentsResponse.json();
-        setRecentDocuments(documents);
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      if (showLoading) {
-        setIsRefreshing(false);
-      }
-    }
-  };
+  // Extract data from React Query
+  const recentActivities = dashboardData?.activities || [];
+  const recentDocuments = dashboardData?.documents || [];
 
   // Function to perform live search
   const performSearch = async (query: string) => {
@@ -172,32 +131,42 @@ export default function DashboardPage() {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, projects, recentDocuments]);
 
-  // Fetch recent activities and documents
-  useEffect(() => {
-    if (isAdmin) {
-      fetchDashboardData();
-    }
+  // Remove old fetch logic - now handled by React Query
 
-    // Simulate loading
-    const timer = setTimeout(() => setLoading(false), 1000);
-    return () => clearTimeout(timer);
-  }, [isAdmin]);
-
-  // Auto-refresh dashboard data every 30 seconds
+  // Auto-refresh dashboard data every 30 seconds using React Query
   useEffect(() => {
     if (!isAdmin) return;
 
     const interval = setInterval(() => {
-      fetchDashboardData();
+      refetch();
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
-  }, [isAdmin]);
+  }, [isAdmin, refetch]);
 
 
   // Don't render the page if user is not admin (but wait for auth to load)
   if (!authLoading && !isAdmin) {
     return null;
+  }
+
+  // Show loading skeleton while data is loading
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography color="error" variant="h6">
+          خطا در بارگذاری اطلاعات داشبورد
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          {error instanceof Error ? error.message : 'خطای نامشخص'}
+        </Typography>
+      </Box>
+    );
   }
 
   // Function to add new project
@@ -241,13 +210,7 @@ export default function DashboardPage() {
     return <Description />;
   };
 
-  if (loading) {
-    return (
-      <Box sx={{ width: '100%', p: 4 }}>
-        <LinearProgress sx={{ height: 8, borderRadius: 4 }} />
-      </Box>
-    );
-  }
+  // Remove old loading state - now handled by React Query
 
   // Prevent hydration mismatch
   if (!mounted) {
@@ -462,8 +425,19 @@ export default function DashboardPage() {
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Tooltip title="بروزرسانی پروژه‌ها">
-                  <IconButton size="small" onClick={() => window.location.reload()} sx={{ color: 'primary.main' }}>
-                    <Refresh />
+                  <IconButton 
+                    size="small" 
+                    onClick={() => refetch()} 
+                    disabled={isLoading}
+                    sx={{ color: 'primary.main' }}
+                  >
+                    <Refresh sx={{ 
+                      animation: isLoading ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }} />
                   </IconButton>
                 </Tooltip>
                 {activeProjects.length > 0 && (
@@ -584,12 +558,12 @@ export default function DashboardPage() {
                   <Tooltip title="بروزرسانی فعالیت‌ها">
                     <IconButton 
                       size="small" 
-                      onClick={() => fetchDashboardData(true)} 
-                      disabled={isRefreshing}
+                      onClick={() => refetch()} 
+                      disabled={isLoading}
                       sx={{ color: 'primary.main' }}
                     >
                       <Refresh sx={{ 
-                        animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                        animation: isLoading ? 'spin 1s linear infinite' : 'none',
                         '@keyframes spin': {
                           '0%': { transform: 'rotate(0deg)' },
                           '100%': { transform: 'rotate(360deg)' }
@@ -649,12 +623,12 @@ export default function DashboardPage() {
                 <Tooltip title="بروزرسانی اسناد">
                   <IconButton 
                     size="small" 
-                    onClick={() => fetchDashboardData(true)} 
-                    disabled={isRefreshing}
+                    onClick={() => refetch()} 
+                    disabled={isLoading}
                     sx={{ color: 'primary.main' }}
                   >
                     <Refresh sx={{ 
-                      animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                      animation: isLoading ? 'spin 1s linear infinite' : 'none',
                       '@keyframes spin': {
                         '0%': { transform: 'rotate(0deg)' },
                         '100%': { transform: 'rotate(360deg)' }

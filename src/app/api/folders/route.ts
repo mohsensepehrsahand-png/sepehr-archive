@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/app/api/_lib/db';
 import { logActivity } from '@/lib/activityLogger';
 
 export async function GET(request: NextRequest) {

@@ -51,6 +51,8 @@ import DesktopProjectCard from "@/components/projects/DesktopProjectCard";
 import MobileSearchBar from "@/components/mobile/MobileSearchBar";
 import MobileFAB from "@/components/mobile/MobileFAB";
 import ConfirmationDialog from "@/components/common/ConfirmationDialog";
+import { useProjects as useProjectsQuery } from "@/hooks/useProjects";
+import { ProjectCardSkeleton } from "@/components/common/LoadingSkeleton";
 
 export default function ProjectListPage() {
   const { 
@@ -64,6 +66,9 @@ export default function ProjectListPage() {
     hideConfirmationDialog,
     setConfirmationLoading
   } = useProjects();
+  
+  // Use React Query for better caching
+  const { data: projectsData, isLoading: queryLoading, error } = useProjectsQuery();
   const { isAdmin } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -210,19 +215,20 @@ export default function ProjectListPage() {
       />
 
       {/* Loading State */}
-      {loading && (
-        <Box sx={{ width: '100%', mb: 3 }}>
-          <LinearProgress />
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-            در حال بارگذاری پروژه‌ها...
-          </Typography>
-        </Box>
+      {(loading || queryLoading) && (
+        <Grid container spacing={2}>
+          {Array.from({ length: 8 }).map((_, index) => (
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={index}>
+              <ProjectCardSkeleton />
+            </Grid>
+          ))}
+        </Grid>
       )}
 
       {/* Projects List */}
       {isMobile ? (
         <Box>
-          {!loading && sortedProjects.map((project) => (
+          {!loading && !queryLoading && sortedProjects.map((project) => (
             <MobileProjectCard
               key={project.id}
               id={project.id}
@@ -241,8 +247,8 @@ export default function ProjectListPage() {
         </Box>
       ) : (
         <Grid container spacing={3}>
-          {!loading && sortedProjects.map((project) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={project.id}>
+          {!loading && !queryLoading && sortedProjects.map((project) => (
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={project.id}>
               <DesktopProjectCard
                 id={project.id}
                 name={project.name}
@@ -262,7 +268,7 @@ export default function ProjectListPage() {
       )}
 
       {/* Empty State */}
-      {!loading && sortedProjects.length === 0 && (
+      {!loading && !queryLoading && sortedProjects.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Folder sx={{ fontSize: 80, color: 'text.disabled', mb: 2 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>

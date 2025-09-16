@@ -135,7 +135,7 @@ export default function FinancePage() {
               : 0;
             
             return (
-              <Grid item xs={12} md={6} lg={4} key={project.id}>
+              <Grid size={{ xs: 12, md: 6, lg: 4 }} key={project.id}>
                 <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
@@ -158,7 +158,7 @@ export default function FinancePage() {
                     )}
 
                     <Grid container spacing={2} mb={3}>
-                      <Grid item xs={6}>
+                      <Grid size={{ xs: 6 }}>
                         <Box textAlign="center">
                           <Typography variant="h6" color="primary" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
                             {project.unitsCount}
@@ -168,7 +168,7 @@ export default function FinancePage() {
                           </Typography>
                         </Box>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={{ xs: 6 }}>
                         <Box textAlign="center">
                           <Typography variant="h6" color="primary" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
                             {project.userCount || project.unitsCount}
@@ -227,7 +227,7 @@ export default function FinancePage() {
 
                   <Box p={2} pt={0}>
                     <Grid container spacing={1}>
-                      <Grid item xs={12}>
+                      <Grid size={{ xs: 12 }}>
                         <Button
                           component={Link}
                           href={isAdmin ? `/finance/${project.id}` : `/finance/${project.id}/my-finance`}

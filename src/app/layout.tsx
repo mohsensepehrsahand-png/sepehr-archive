@@ -3,6 +3,7 @@ import "@fontsource/vazirmatn/400.css";
 import "@fontsource/vazirmatn/600.css";
 import "./globals.css";
 import ThemeProvider from "@/components/providers/ThemeProvider";
+import QueryProvider from "@/components/providers/QueryProvider";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -21,13 +22,15 @@ export default function RootLayout({
   return (
     <html lang="fa">
       <body>
-        <ThemeProvider>
-          <AuthProvider>
-            <ProjectProvider>
-              {children}
-            </ProjectProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <QueryProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <ProjectProvider>
+                {children}
+              </ProjectProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   );

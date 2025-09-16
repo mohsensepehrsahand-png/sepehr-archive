@@ -34,7 +34,7 @@ import {
 import { ArrowBack, Edit, Delete, Add, Cancel, Save } from "@mui/icons-material";
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import SummaryCard from "@/components/finance/SummaryCard";
-import ErrorBoundary from "@/components/common/ErrorBoundary";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import PenaltySettingsManager from "@/components/finance/PenaltySettingsManager";
 import InstallmentTable from "@/components/finance/InstallmentTable";
 import { useRouter } from "next/navigation";

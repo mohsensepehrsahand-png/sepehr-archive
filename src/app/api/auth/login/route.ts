@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/app/api/_lib/db';
 import bcrypt from 'bcryptjs';
 
 // Helper function to get client IP
@@ -81,7 +81,18 @@ async function deactivateUser(userId: string): Promise<void> {
 // POST /api/auth/login - ورود کاربر
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      console.error('JSON parsing error:', jsonError);
+      return NextResponse.json(
+        { error: 'فرمت درخواست نامعتبر است' },
+        { status: 400 }
+      );
+    }
+
+    const { username, password } = body;
     const clientIP = getClientIP(request);
     const userAgent = request.headers.get('user-agent') || '';
 

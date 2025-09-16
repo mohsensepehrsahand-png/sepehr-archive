@@ -3,6 +3,7 @@ import { Box, CssBaseline, useMediaQuery, useTheme } from "@mui/material";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import PrefetchLinks from "@/components/common/PrefetchLinks";
 import { ReactNode } from "react";
 
 interface MainLayoutProps {
@@ -22,6 +23,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       direction: "rtl"
     }}>
       <CssBaseline />
+      <PrefetchLinks />
       <Box sx={{ 
         position: "relative",
         zIndex: 1000,
