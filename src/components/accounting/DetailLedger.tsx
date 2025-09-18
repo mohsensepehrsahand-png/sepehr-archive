@@ -69,7 +69,6 @@ interface Props { projectId: string; }
 export default function DetailLedger({ projectId }: Props) {
   const [groups, setGroups] = useState<CodingGroup[]>([]);
   const [selectedDetails, setSelectedDetails] = useState<Record<string, boolean>>({});
-  const [expandedClasses, setExpandedClasses] = useState<Record<string, boolean>>({});
   const [expandedSubClasses, setExpandedSubClasses] = useState<Record<string, boolean>>({});
   const [detailTables, setDetailTables] = useState<DetailTable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,18 +79,42 @@ export default function DetailLedger({ projectId }: Props) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showAllDetails, setShowAllDetails] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [shouldGenerateTables, setShouldGenerateTables] = useState(false);
 
   useEffect(() => {
     fetchInitial();
   }, [projectId]);
 
   useEffect(() => {
-    buildRows();
-  }, [selectedDetails, dateFrom, dateTo, showAllDetails]);
+    // Only generate tables when shouldGenerateTables is true
+    if (shouldGenerateTables) {
+      buildRows();
+      setShouldGenerateTables(false);
+    }
+  }, [shouldGenerateTables]);
 
   const selectedCodes = useMemo(() => {
     return Object.keys(selectedDetails).filter(k => selectedDetails[k]);
   }, [selectedDetails]);
+
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery.trim()) return groups;
+    
+    return groups.map(group => ({
+      ...group,
+      classes: group.classes?.map(cls => ({
+        ...cls,
+        subClasses: cls.subClasses?.map(sub => ({
+          ...sub,
+          details: sub.details?.filter(detail => 
+            detail.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            `${group.code}${cls.code}${sub.code}${detail.code}`.includes(searchQuery)
+          )
+        })).filter(sub => sub.details && sub.details.length > 0)
+      })).filter(cls => cls.subClasses && cls.subClasses.length > 0)
+    })).filter(group => group.classes && group.classes.length > 0);
+  }, [groups, searchQuery]);
 
   const fetchInitial = async () => {
     try {
@@ -262,22 +285,42 @@ export default function DetailLedger({ projectId }: Props) {
     }
   };
 
-  const toggleClass = (classId: string) => {
-    setExpandedClasses(prev => ({ ...prev, [classId]: !prev[classId] }));
-  };
 
   const toggleSubClass = (subClassId: string) => {
     setExpandedSubClasses(prev => ({ ...prev, [subClassId]: !prev[subClassId] }));
   };
 
   const toggleDetail = (fullCode: string) => {
-    setSelectedDetails(prev => ({ ...prev, [fullCode]: !prev[fullCode] }));
+    setSelectedDetails(prev => {
+      const newState = { ...prev, [fullCode]: !prev[fullCode] };
+      return newState;
+    });
   };
 
   const handleCheckboxChange = (fullCode: string, event: React.ChangeEvent<HTMLInputElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
     toggleDetail(fullCode);
+  };
+
+  const removeSelectedAccount = (fullCode: string) => {
+    setSelectedDetails(prev => ({ ...prev, [fullCode]: false }));
+  };
+
+  const getAccountName = (fullCode: string) => {
+    for (const group of groups) {
+      for (const cls of group.classes || []) {
+        for (const sub of cls.subClasses || []) {
+          for (const detail of sub.details || []) {
+            if (`${group.code}${cls.code}${sub.code}${detail.code}` === fullCode) {
+              return detail.name;
+            }
+          }
+        }
+      }
+    }
+    return fullCode;
   };
 
   const calculateRunningBalances = (rows: LedgerRow[]) => {
@@ -315,11 +358,12 @@ export default function DetailLedger({ projectId }: Props) {
         <CardContent>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <Box display="flex" gap={1} alignItems="center">
-              <Box sx={{ minWidth: 240 }}>
+              <Box sx={{ width: '7cm' }}>
                 <Button
                   variant="outlined"
                   onClick={(e) => setAnchorEl(e.currentTarget)}
                   endIcon={anchorEl ? <ExpandLess /> : <ExpandMore />}
+                  sx={{ width: '100%', justifyContent: 'space-between' }}
                 >
                   {selectedCodes.length > 0 ? `انتخاب شده: ${selectedCodes.length}` : 'انتخاب حساب‌های تفصیلی'}
                 </Button>
@@ -327,44 +371,98 @@ export default function DetailLedger({ projectId }: Props) {
                   open={Boolean(anchorEl)}
                   anchorEl={anchorEl}
                   onClose={() => setAnchorEl(null)}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                  PaperProps={{ sx: { width: '25%', minWidth: 300 } }}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+                  PaperProps={{ 
+                    sx: { 
+                      width: '100%',
+                      minWidth: 800,
+                      maxWidth: '90vw',
+                      maxHeight: 500,
+                      overflow: 'hidden'
+                    }
+                  }}
                 >
-                  <Box sx={{ maxHeight: 360, overflow: 'auto' }}>
-                    {groups.map(group => (
+                  <Box sx={{ p: 2, borderBottom: '1px solid #eee' }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="جستجو در حساب‌های تفصیلی..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', mb: 2 }}
+                    />
+                    {selectedCodes.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" sx={{ 
+                          fontFamily: 'Vazirmatn, Arial, sans-serif', 
+                          fontWeight: 'bold', 
+                          mb: 1,
+                          color: '#1976d2'
+                        }}>
+                          حساب‌های انتخاب شده:
+                        </Typography>
+                        <Box sx={{ 
+                          maxHeight: 120, 
+                          overflow: 'auto', 
+                          border: '1px solid #e0e0e0', 
+                          borderRadius: 1, 
+                          p: 1,
+                          backgroundColor: '#f9f9f9'
+                        }}>
+                          {selectedCodes.map(code => (
+                            <Chip
+                              key={code}
+                              label={`${getAccountName(code)} (${code})`}
+                              onDelete={() => removeSelectedAccount(code)}
+                              size="small"
+                              sx={{ 
+                                m: 0.5,
+                                fontFamily: 'Vazirmatn, Arial, sans-serif',
+                                '& .MuiChip-deleteIcon': {
+                                  fontSize: '16px'
+                                }
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
+                  <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                    {filteredGroups.length === 0 && (
+                      <Box sx={{ p: 2, textAlign: 'center' }}>
+                        <Typography variant="body2" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                          {loading ? 'در حال بارگذاری...' : 'هیچ حسابی یافت نشد'}
+                        </Typography>
+                      </Box>
+                    )}
+                    {filteredGroups.map(group => (
                       <Box key={group.id}>
                         {group.classes?.map(cls => (
                           <Box key={cls.id}>
-                            <Box sx={{ position: 'sticky', top: 0, zIndex: 1, background: '#fafafa', borderBottom: '1px solid #eee', px: 1, py: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Button size="small" onClick={() => toggleClass(cls.id)} startIcon={expandedClasses[cls.id] ? <ExpandLess /> : <ExpandMore />}>{cls.name} <Chip label={group.code + cls.code} size="small" sx={{ ml: 1 }} /></Button>
-                            </Box>
-                            <Collapse in={expandedClasses[cls.id] ?? true}>
-                              <Box sx={{ px: 2, py: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                {cls.subClasses?.map(sub => (
-                                  <Box key={sub.id}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid #f0f0f0', py: 0.5 }}>
-                                      <Button size="small" onClick={() => toggleSubClass(sub.id)} startIcon={expandedSubClasses[sub.id] ? <ExpandLess /> : <ExpandMore />}>{sub.name} <Chip label={group.code + cls.code + sub.code} size="small" sx={{ ml: 1 }} /></Button>
-                                    </Box>
-                                    <Collapse in={expandedSubClasses[sub.id] ?? false}>
-                                      <Box sx={{ px: 2, py: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                        {sub.details?.map(detail => {
-                                          const full = `${group.code}${cls.code}${sub.code}${detail.code}`;
-                                          const checked = !!selectedDetails[full];
-                                          return (
-                                            <Box key={detail.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid #f0f0f0', py: 0.5 }}>
-                                              <Checkbox checked={checked} onChange={(e) => handleCheckboxChange(full, e)} />
-                                              <Typography variant="body2" sx={{ flex: 1 }}>{detail.name}</Typography>
-                                              <Chip label={full} size="small" />
-                                            </Box>
-                                          );
-                                        })}
-                                      </Box>
-                                    </Collapse>
+                            {cls.subClasses?.map(sub => (
+                              <Box key={sub.id}>
+                                <Box sx={{ position: 'sticky', top: 0, zIndex: 1, background: '#fafafa', borderBottom: '1px solid #eee', px: 1, py: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Button size="small" onClick={() => toggleSubClass(sub.id)} startIcon={expandedSubClasses[sub.id] ? <ExpandLess /> : <ExpandMore />}>{sub.name} <Chip label={group.code + cls.code + sub.code} size="small" sx={{ ml: 1 }} /></Button>
+                                </Box>
+                                <Collapse in={expandedSubClasses[sub.id] ?? true}>
+                                  <Box sx={{ px: 2, py: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                    {sub.details?.map(detail => {
+                                      const full = `${group.code}${cls.code}${sub.code}${detail.code}`;
+                                      const checked = !!selectedDetails[full];
+                                      return (
+                                        <Box key={detail.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid #f0f0f0', py: 0.5 }}>
+                                          <Checkbox checked={checked} onChange={(e) => handleCheckboxChange(full, e)} />
+                                          <Typography variant="body2" sx={{ flex: 1 }}>{detail.name}</Typography>
+                                          <Chip label={full} size="small" />
+                                        </Box>
+                                      );
+                                    })}
                                   </Box>
-                                ))}
+                                </Collapse>
                               </Box>
-                            </Collapse>
+                            ))}
                           </Box>
                         ))}
                       </Box>
@@ -372,6 +470,18 @@ export default function DetailLedger({ projectId }: Props) {
                   </Box>
                 </Popover>
               </Box>
+              
+              <Button
+                variant="contained"
+                onClick={() => setShouldGenerateTables(true)}
+                disabled={selectedCodes.length === 0}
+                sx={{ 
+                  fontFamily: 'Vazirmatn, Arial, sans-serif',
+                  width: '7cm'
+                }}
+              >
+                تایید و دیدن دفتر
+              </Button>
               
               <Button 
                 variant="outlined" 
@@ -440,7 +550,7 @@ export default function DetailLedger({ projectId }: Props) {
                 {table.accountName} ({table.accountCode})
               </Typography>
               
-              <TableContainer component={Paper}>
+              <TableContainer component={Paper} sx={{ width: '7cm' }}>
                 <Table>
                   <TableHead>
                     <TableRow sx={{ backgroundColor: '#757575' }}>

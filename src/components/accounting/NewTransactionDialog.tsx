@@ -19,6 +19,7 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import PersianDatePicker from '../common/PersianDatePicker';
 
 interface Account {
   id: string;
@@ -213,14 +214,13 @@ export default function NewTransactionDialog({ open, onClose, projectId, onSucce
                 name="date"
                 control={control}
                 render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="تاریخ"
-                    type="date"
-                    fullWidth
+                  <PersianDatePicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    label="تاریخ سند"
                     error={!!errors.date}
                     helperText={errors.date?.message}
-                    InputLabelProps={{ shrink: true }}
+                    fullWidth
                   />
                 )}
               />

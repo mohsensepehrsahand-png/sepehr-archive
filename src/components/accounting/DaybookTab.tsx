@@ -33,6 +33,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { faIR } from 'date-fns/locale';
+import PersianDatePicker from '../common/PersianDatePicker';
 
 interface Document {
   id: string;
@@ -203,23 +204,21 @@ export default function DaybookTab({ projectId }: DaybookTabProps) {
               sx={{ minWidth: 250 }}
             />
 
-            <TextField
-              label="از تاریخ"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
+            <Box sx={{ minWidth: 150 }}>
+              <PersianDatePicker
+                value={startDate}
+                onChange={setStartDate}
+                label="از تاریخ"
+              />
+            </Box>
 
-            <TextField
-              label="تا تاریخ"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
+            <Box sx={{ minWidth: 150 }}>
+              <PersianDatePicker
+                value={endDate}
+                onChange={setEndDate}
+                label="تا تاریخ"
+              />
+            </Box>
 
             <Button
               variant="contained"

@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import { useState, useEffect } from "react";
+import PersianDatePicker from "../common/PersianDatePicker";
 
 interface Payment {
   id: string;
@@ -112,16 +113,11 @@ export default function EditPaymentDialog({
             helperText={payment?.receiptImagePath ? "مبلغ فیش روی محاسبات قسط تأثیر نمی‌گذارد" : undefined}
           />
 
-          <TextField
-            fullWidth
-            label={payment?.receiptImagePath ? "تاریخ فیش" : "تاریخ پرداخت"}
-            type="date"
+          <PersianDatePicker
             value={paymentDate}
-            onChange={(e) => setPaymentDate(e.target.value)}
+            onChange={setPaymentDate}
+            label={payment?.receiptImagePath ? "تاریخ فیش" : "تاریخ پرداخت"}
             disabled={loading}
-            InputLabelProps={{ shrink: true }}
-            sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
-            inputProps={{ sx: { fontFamily: 'Vazirmatn, Arial, sans-serif' } }}
             helperText={payment?.receiptImagePath ? "تاریخ فیش روی محاسبات قسط تأثیر نمی‌گذارد" : undefined}
           />
 

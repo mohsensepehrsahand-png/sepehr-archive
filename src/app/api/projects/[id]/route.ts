@@ -5,17 +5,17 @@ import { cookies } from 'next/headers';
 // GET /api/projects/[id] - دریافت اطلاعات یک پروژه
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const userRole = cookieStore.get('userRole')?.value;
 
     if (userRole !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
 
     const project = await prisma.project.findUnique({
       where: { id: projectId },
@@ -64,17 +64,17 @@ export async function GET(
 // PUT /api/projects/[id] - ویرایش پروژه
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const userRole = cookieStore.get('userRole')?.value;
 
     if (userRole !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
     const body = await request.json();
     const { name, description, status } = body;
 
@@ -140,17 +140,17 @@ export async function PUT(
 // DELETE /api/projects/[id] - حذف پروژه
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const userRole = cookieStore.get('userRole')?.value;
 
     if (userRole !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
 
     await prisma.project.delete({
       where: { id: projectId },

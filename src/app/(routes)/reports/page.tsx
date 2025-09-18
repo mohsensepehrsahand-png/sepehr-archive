@@ -57,6 +57,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import PersianDatePicker from "@/components/common/PersianDatePicker";
 
 // Mock data for reports
 const mockReportData = {
@@ -180,25 +181,17 @@ export default function ReportsPage() {
         <CardContent>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 3 }}>
             <Box>
-              <TextField
-                fullWidth
-                type="date"
-                label="از تاریخ"
+              <PersianDatePicker
                 value={dateRange.start}
-                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-                sx={{ '& .MuiInputBase-input': { fontFamily: 'Vazirmatn, Arial, sans-serif' }, '& .MuiInputLabel-root': { fontFamily: 'Vazirmatn, Arial, sans-serif' } }}
+                onChange={(date) => setDateRange({ ...dateRange, start: date })}
+                label="از تاریخ"
               />
             </Box>
             <Box>
-              <TextField
-                fullWidth
-                type="date"
-                label="تا تاریخ"
+              <PersianDatePicker
                 value={dateRange.end}
-                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-                sx={{ '& .MuiInputBase-input': { fontFamily: 'Vazirmatn, Arial, sans-serif' }, '& .MuiInputLabel-root': { fontFamily: 'Vazirmatn, Arial, sans-serif' } }}
+                onChange={(date) => setDateRange({ ...dateRange, end: date })}
+                label="تا تاریخ"
               />
             </Box>
             <Box>

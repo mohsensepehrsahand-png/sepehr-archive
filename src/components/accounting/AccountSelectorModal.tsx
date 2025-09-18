@@ -544,7 +544,7 @@ export default function AccountSelectorModal({
           <Grid container spacing={2} sx={{ mb: 4 }}>
             {/* Group Column */}
             <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ height: '400px' }}>
+              <Card sx={{ height: '600px' }}>
                 <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                     <Typography variant="subtitle1" sx={{ 
@@ -620,7 +620,7 @@ export default function AccountSelectorModal({
 
             {/* Class Column */}
             <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ height: '400px' }}>
+              <Card sx={{ height: '600px' }}>
                 <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                     <Typography variant="subtitle1" sx={{ 
@@ -724,7 +724,7 @@ export default function AccountSelectorModal({
 
             {/* SubClass Column */}
             <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ height: '400px' }}>
+              <Card sx={{ height: '600px' }}>
                 <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                     <Typography variant="subtitle1" sx={{ 
@@ -827,7 +827,7 @@ export default function AccountSelectorModal({
 
             {/* Detail Column */}
             <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ height: '400px' }}>
+              <Card sx={{ height: '600px' }}>
                 <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                     <Typography variant="subtitle1" sx={{ 

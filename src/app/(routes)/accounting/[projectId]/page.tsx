@@ -24,7 +24,9 @@ import {
   AccountBalanceWallet,
   Assessment,
   AccountTree,
-  Description
+  Description,
+  PlayArrow,
+  Stop
 } from '@mui/icons-material';
 import Daybook from '@/components/accounting/Daybook';
 import GeneralLedger from '@/components/accounting/GeneralLedger';
@@ -34,6 +36,8 @@ import BankIntegration from '@/components/accounting/BankIntegration';
 import HierarchicalCodingDefinition from '@/components/accounting/HierarchicalCodingDefinition';
 import ReportsTab from '@/components/accounting/ReportsTab';
 import DocumentsTab from '@/components/accounting/DocumentsTab';
+import OpeningEntryTab from '@/components/accounting/OpeningEntryTab';
+import ClosingEntryTab from '@/components/accounting/ClosingEntryTab';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -122,6 +126,16 @@ export default function ProjectAccountingPage() {
       component: <DocumentsTab key={refreshKey} projectId={projectId} />
     },
     {
+      label: 'سند افتتاحیه',
+      icon: <PlayArrow />,
+      component: <OpeningEntryTab key={`opening-${refreshKey}`} projectId={projectId} />
+    },
+    {
+      label: 'سند اختتامیه',
+      icon: <Stop />,
+      component: <ClosingEntryTab key={refreshKey} projectId={projectId} />
+    },
+    {
       label: 'دفتر روزنامه',
       icon: <Receipt />,
       component: <Daybook key={refreshKey} projectId={projectId} />
@@ -159,11 +173,8 @@ export default function ProjectAccountingPage() {
         <CardContent>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <Box>
-              <Typography variant="h4" component="h1">
-                حسابداری پروژه
-              </Typography>
               {projectName && (
-                <Typography variant="subtitle1" color="text.secondary">
+                <Typography variant="h4" component="h1">
                   {projectName}
                 </Typography>
               )}
@@ -187,9 +198,6 @@ export default function ProjectAccountingPage() {
             </Box>
           </Box>
 
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            مدیریت کامل سیستم حسابداری پروژه شامل کدینگ، دفاتر و گزارش‌ها
-          </Typography>
 
           <Paper sx={{ width: '100%' }}>
             <Tabs

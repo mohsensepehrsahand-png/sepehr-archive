@@ -81,6 +81,8 @@ model Project {
   ledgers             Ledger[]
   banks               Bank[]
   accountingDocuments AccountingDocument[]
+  fiscalYears         FiscalYear[]
+  commonDescriptions  CommonDescription[]
 }
 
 model Folder {
@@ -913,4 +915,39 @@ model AccountingEntry {
 
   @@index([documentId])
   @@index([accountCode])
+}
+
+// Fiscal Year Model
+model FiscalYear {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  year            Int      // سال مالی (مثل 1403)
+  startDate       DateTime // تاریخ شروع سال مالی
+  endDate         DateTime // تاریخ پایان سال مالی
+  isActive        Boolean  @default(true) // آیا سال مالی فعال است
+  isClosed        Boolean  @default(false) // آیا سال مالی بسته شده است
+  openingEntryId  String?  // شناسه سند افتتاحیه
+  closingEntryId  String?  // شناسه سند اختتامیه
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([projectId, year])
+  @@index([projectId])
+  @@index([year])
+  @@index([isActive])
+}
+
+// Common Descriptions Model
+model CommonDescription {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  text        String
+  usageCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([usageCount])
 }

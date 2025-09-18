@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { Close, Edit } from "@mui/icons-material";
 import { useState, useEffect } from "react";
+import PersianDatePicker from "../common/PersianDatePicker";
 
 interface Receipt {
   id: string;
@@ -141,17 +142,10 @@ export default function EditReceiptDialog({
             }}
           />
           
-          <TextField
-            label="تاریخ فیش"
-            type="date"
+          <PersianDatePicker
             value={receiptDate}
-            onChange={(e) => setReceiptDate(e.target.value)}
-            fullWidth
-            variant="outlined"
-            InputLabelProps={{
-              shrink: true,
-            }}
-            sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            onChange={setReceiptDate}
+            label="تاریخ فیش"
           />
           
           <TextField

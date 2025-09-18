@@ -46,6 +46,7 @@ import {
   ExpandMore,
   Refresh
 } from '@mui/icons-material';
+import PersianDatePicker from '../common/PersianDatePicker';
 
 interface Bank {
   id: string;
@@ -432,13 +433,10 @@ export default function BankIntegration({ projectId }: BankIntegrationProps) {
               />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                type="date"
-                label="تاریخ"
+              <PersianDatePicker
                 value={formData.date}
-                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
+                onChange={(date) => setFormData(prev => ({ ...prev, date }))}
+                label="تاریخ"
               />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>

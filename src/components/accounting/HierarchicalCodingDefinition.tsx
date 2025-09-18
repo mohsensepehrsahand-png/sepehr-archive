@@ -23,7 +23,9 @@ import {
   FormControlLabel,
   Switch,
   Divider,
-  Menu
+  Menu,
+  Tooltip,
+  Snackbar
 } from '@mui/material';
 import {
   Add,
@@ -34,7 +36,10 @@ import {
   AccountTree,
   MoreVert,
   CloudDownload,
-  ImportExport
+  ImportExport,
+  Lock,
+  LockOpen,
+  DragIndicator
 } from '@mui/icons-material';
 
 interface Project {
@@ -139,11 +144,19 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
 
+  // Toast notification state
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastSeverity, setToastSeverity] = useState<'success' | 'info' | 'warning' | 'error'>('info');
+
   // Selection states
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedSubClass, setSelectedSubClass] = useState<string>('');
   const [selectedDetail, setSelectedDetail] = useState<string>('');
+  
+  // All groups view state
+  const [showAllGroups, setShowAllGroups] = useState<boolean>(false);
 
   // Form states
   const [newGroupCode, setNewGroupCode] = useState('');
@@ -162,18 +175,29 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addDialogLevel, setAddDialogLevel] = useState<'group' | 'class' | 'subclass' | 'detail'>('group');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editDialogLevel, setEditDialogLevel] = useState<'class' | 'subclass' | 'detail'>('class');
+  const [editDialogLevel, setEditDialogLevel] = useState<'group' | 'class' | 'subclass' | 'detail'>('group');
   const [editingItem, setEditingItem] = useState<any>(null);
   
   // Context menu states
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
     mouseY: number;
-    type: 'class' | 'subclass' | 'detail';
+    type: 'group' | 'class' | 'subclass' | 'detail';
     item?: any;
   } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  
+  // Global lock state - groups are locked by default
+  const [isGlobalLocked, setIsGlobalLocked] = useState(true);
+  
+  // Force re-render when groups change
+  const [dragKey, setDragKey] = useState(0);
+  
+  useEffect(() => {
+    // Force re-render of drag context when groups change
+    setDragKey(prev => prev + 1);
+  }, [groups]);
   
   // Helper functions for code generation
   const getNextGroupCode = () => {
@@ -213,6 +237,12 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
     return String(maxCode + 1).padStart(2, '0');
   };
 
+  // Toast notification helper
+  const showToast = (message: string, severity: 'success' | 'info' | 'warning' | 'error' = 'info') => {
+    setToastMessage(message);
+    setToastSeverity(severity);
+    setToastOpen(true);
+  };
 
   useEffect(() => {
     fetchProject();
@@ -243,7 +273,12 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       const data = await response.json();
       
       // Do not auto-initialize groups; show empty state
-      setGroups(data || []);
+      // Ensure all groups are protected by default
+      const groupsWithProtection = (data || []).map(group => ({
+        ...group,
+        isProtected: group.isProtected !== undefined ? group.isProtected : true
+      }));
+      setGroups(groupsWithProtection);
     } catch (error) {
       console.error('Error fetching coding data:', error);
       setError(error instanceof Error ? error.message : 'خطا در دریافت اطلاعات کدینگ');
@@ -284,6 +319,12 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
           setError('کد گروه باید بین 1 تا 9 باشد');
           return;
         }
+        console.log('Creating group with data:', {
+          projectId,
+          code: newGroupCode.trim(),
+          name: newGroupName.trim()
+        });
+        
         response = await fetch('/api/accounting/coding/groups', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -293,6 +334,8 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
             name: newGroupName.trim()
           })
         });
+        
+        console.log('Group creation response:', response.status, response.statusText);
       } else if (addDialogLevel === 'class') {
         if (!selectedGroup || !newClassName.trim() || !newClassCode.trim()) {
           setError('لطفاً ابتدا یک گروه انتخاب کنید و اطلاعات کل را وارد کنید');
@@ -411,11 +454,11 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       setNewDetailCode('');
       setNewDetailDescription('');
       setAddDialogOpen(false);
-      setSuccess('آیتم جدید با موفقیت اضافه شد');
+      showToast('آیتم جدید با موفقیت اضافه شد', 'success');
       fetchCodingData();
     } catch (error) {
       console.error('Error adding item:', error);
-      setError(error instanceof Error ? error.message : 'خطا در افزودن آیتم');
+      showToast(error instanceof Error ? error.message : 'خطا در افزودن آیتم', 'error');
     }
   };
 
@@ -462,6 +505,52 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
     return subClass?.details.find(d => d.id === selectedDetail);
   };
 
+  // Helper functions for "All Groups" view
+  const getAllClasses = () => {
+    if (!showAllGroups) return [];
+    return groups.flatMap(group => 
+      group.classes.map(accountClass => ({
+        ...accountClass,
+        groupCode: group.code,
+        groupName: group.name
+      }))
+    );
+  };
+
+  const getAllSubClasses = () => {
+    if (!showAllGroups) return [];
+    return groups.flatMap(group => 
+      group.classes.flatMap(accountClass => 
+        accountClass.subClasses.map(subClass => ({
+          ...subClass,
+          groupCode: group.code,
+          groupName: group.name,
+          classCode: accountClass.code,
+          className: accountClass.name
+        }))
+      )
+    );
+  };
+
+  const getAllDetails = () => {
+    if (!showAllGroups) return [];
+    return groups.flatMap(group => 
+      group.classes.flatMap(accountClass => 
+        accountClass.subClasses.flatMap(subClass => 
+          subClass.details.map(detail => ({
+            ...detail,
+            groupCode: group.code,
+            groupName: group.name,
+            classCode: accountClass.code,
+            className: accountClass.name,
+            subClassCode: subClass.code,
+            subClassName: subClass.name
+          }))
+        )
+      )
+    );
+  };
+
   // Helper function to get full code for display
   const getFullCode = (item: any, level: 'group' | 'class' | 'subclass' | 'detail') => {
     if (!item) return '';
@@ -485,7 +574,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
   };
 
   // Context menu handlers
-  const handleContextMenu = (event: React.MouseEvent, type: 'class' | 'subclass' | 'detail', item: any) => {
+  const handleContextMenu = (event: React.MouseEvent, type: 'group' | 'class' | 'subclass' | 'detail', item: any) => {
     event.preventDefault();
     setContextMenu({
       mouseX: event.clientX + 2,
@@ -503,6 +592,9 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
     if (!contextMenu) return;
 
     switch (action) {
+      case 'edit-group':
+        if (contextMenu.item) openEditDialog('group', contextMenu.item);
+        break;
       case 'edit-class':
         if (contextMenu.item) openEditDialog('class', contextMenu.item);
         break;
@@ -511,6 +603,9 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
         break;
       case 'edit-detail':
         if (contextMenu.item) openEditDialog('detail', contextMenu.item);
+        break;
+      case 'delete-group':
+        if (contextMenu.item) handleDeleteItem('group', contextMenu.item.id);
         break;
       case 'delete-class':
         if (contextMenu.item) handleDeleteItem('class', contextMenu.item.id);
@@ -525,12 +620,15 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
     handleCloseContextMenu();
   };
 
-  const openEditDialog = (level: 'class' | 'subclass' | 'detail', item: any) => {
-    setEditDialogLevel(level);
+  const openEditDialog = (level: 'group' | 'class' | 'subclass' | 'detail', item: any) => {
+    setEditDialogLevel(level as any);
     setEditingItem(item);
     
     // Initialize form values with current item data
-    if (level === 'class') {
+    if (level === 'group') {
+      setNewGroupName(item.name);
+      setNewGroupCode(item.code);
+    } else if (level === 'class') {
       setNewClassName(item.name);
       setNewClassNature(item.nature);
       setNewClassCode(item.code);
@@ -547,10 +645,11 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
     setEditDialogOpen(true);
   };
 
-  const handleDeleteItem = async (level: 'class' | 'subclass' | 'detail', itemId: string) => {
+  const handleDeleteItem = async (level: 'group' | 'class' | 'subclass' | 'detail', itemId: string) => {
     try {
       let endpoint = '';
-      if (level === 'class') endpoint = `/api/accounting/coding/classes?id=${itemId}`;
+      if (level === 'group') endpoint = `/api/accounting/coding/groups?id=${itemId}`;
+      else if (level === 'class') endpoint = `/api/accounting/coding/classes?id=${itemId}`;
       else if (level === 'subclass') endpoint = `/api/accounting/coding/subclasses?id=${itemId}`;
       else if (level === 'detail') endpoint = `/api/accounting/coding/details?id=${itemId}`;
 
@@ -563,11 +662,11 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
         throw new Error(errorData.error || 'خطا در حذف آیتم');
       }
 
-      setSuccess('آیتم با موفقیت حذف شد');
+      showToast('آیتم با موفقیت حذف شد', 'success');
       fetchCodingData();
     } catch (error) {
       console.error('Error deleting item:', error);
-      setError(error instanceof Error ? error.message : 'خطا در حذف آیتم');
+      showToast(error instanceof Error ? error.message : 'خطا در حذف آیتم', 'error');
     }
   };
 
@@ -578,7 +677,18 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       let endpoint = '';
       let body: any = {};
 
-      if (editDialogLevel === 'class') {
+      if (editDialogLevel === 'group') {
+        if (!validateGroupCode(newGroupCode)) {
+          setError('کد گروه باید بین 1 تا 9 باشد');
+          return;
+        }
+        
+        endpoint = `/api/accounting/coding/groups?id=${editingItem.id}`;
+        body = {
+          name: newGroupName.trim(),
+          code: newGroupCode
+        };
+      } else if (editDialogLevel === 'class') {
         const group = groups.find(g => g.id === selectedGroup);
         
         if (!validateClassCode(newClassCode)) {
@@ -642,11 +752,11 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       setNewSubClassName('');
       setNewDetailName('');
       setNewDetailDescription('');
-      setSuccess('آیتم با موفقیت ویرایش شد');
+      showToast('آیتم با موفقیت ویرایش شد', 'success');
       fetchCodingData();
     } catch (error) {
       console.error('Error editing item:', error);
-      setError(error instanceof Error ? error.message : 'خطا در ویرایش آیتم');
+      showToast(error instanceof Error ? error.message : 'خطا در ویرایش آیتم', 'error');
     }
   };
 
@@ -681,7 +791,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
         throw new Error(errorData.error || 'خطا در ایمپورت کدینگ پیش فرض');
       }
 
-      setSuccess('کدینگ پیش فرض با موفقیت ایمپورت شد');
+      showToast('کدینگ پیش فرض با موفقیت ایمپورت شد', 'success');
       fetchCodingData();
     } catch (error) {
       console.error('Error importing default coding:', error);
@@ -690,6 +800,113 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       setLoadingData(false);
     }
   };
+
+
+  // HTML5 Drag and Drop handlers
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (isGlobalLocked) {
+      e.preventDefault();
+      return;
+    }
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (isGlobalLocked || draggedIndex === null || draggedIndex === dropIndex || showAllGroups) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    try {
+      // Create new order
+      const newGroups = Array.from(groups);
+      const [reorderedItem] = newGroups.splice(draggedIndex, 1);
+      newGroups.splice(dropIndex, 0, reorderedItem);
+
+      // Update sort order and codes based on new positions
+      const updatedGroups = newGroups.map((group, index) => ({
+        ...group,
+        sortOrder: index + 1,
+        code: String(index + 1)
+      }));
+
+      // Update groups in state immediately for better UX
+      setGroups(updatedGroups);
+
+      // Send update to server
+      const response = await fetch('/api/accounting/coding/groups/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          groups: updatedGroups.map(g => ({
+            id: g.id,
+            sortOrder: g.sortOrder,
+            code: g.code
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'خطا در به‌روزرسانی ترتیب گروه‌ها');
+      }
+
+      showToast('ترتیب گروه‌ها با موفقیت به‌روزرسانی شد', 'success');
+    } catch (error) {
+      console.error('Error reordering groups:', error);
+      showToast(error instanceof Error ? error.message : 'خطا در تغییر ترتیب گروه‌ها', 'error');
+      // Revert to original order
+      fetchCodingData();
+    } finally {
+      setDraggedIndex(null);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  const handleToggleGlobalLock = async () => {
+    try {
+      const newLockState = !isGlobalLocked;
+      
+      // Update all groups' protection status
+      const updatePromises = groups.map(group => 
+        fetch(`/api/accounting/coding/groups?id=${group.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: group.code,
+            name: group.name,
+            isDefault: group.isDefault,
+            isProtected: newLockState
+          })
+        })
+      );
+
+      await Promise.all(updatePromises);
+      
+      setIsGlobalLocked(newLockState);
+      showToast(`همه گروه‌ها ${newLockState ? 'قفل شدند' : 'باز شدند'}`, 'success');
+      fetchCodingData();
+    } catch (error) {
+      console.error('Error toggling global lock:', error);
+      showToast('خطا در تغییر وضعیت قفل همه گروه‌ها', 'error');
+    }
+  };
+
 
   if (loadingData || !project) {
     return (
@@ -755,8 +972,8 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       {/* Hierarchical Selection Grid */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         {/* Group Column */}
-        <Grid size={{ xs: 12, md: 2 }}>
-          <Card sx={{ height: '500px' }}>
+        <Grid size={{ xs: 12, md: 3 }}>
+          <Card sx={{ height: '700px' }}>
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                 <Typography variant="subtitle1" sx={{ 
@@ -766,14 +983,26 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
                 }}>
                   گروه
                 </Typography>
-                <IconButton 
-                  size="small" 
-                  color="primary"
-                  onClick={() => openAddDialog('group')}
-                  sx={{ p: 0.5 }}
-                >
-                  <Add fontSize="small" />
-                </IconButton>
+                <Box display="flex" alignItems="center" gap={0.5}>
+                  <Tooltip title={isGlobalLocked ? "باز کردن قفل همه گروه‌ها" : "قفل کردن همه گروه‌ها"}>
+                    <IconButton 
+                      size="small" 
+                      onClick={handleToggleGlobalLock}
+                      sx={{ p: 0.5 }}
+                    >
+                      {isGlobalLocked ? <LockOpen fontSize="small" color="warning" /> : <Lock fontSize="small" color="primary" />}
+                    </IconButton>
+                  </Tooltip>
+                  <IconButton 
+                    size="small" 
+                    color="primary"
+                    onClick={() => openAddDialog('group')}
+                    disabled={isGlobalLocked}
+                    sx={{ p: 0.5 }}
+                  >
+                    <Add fontSize="small" />
+                  </IconButton>
+                </Box>
               </Box>
               
               <Box sx={{ flex: 1 }}>
@@ -787,42 +1016,136 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
                     هیچ گروهی تعریف نشده است
                   </Typography>
                 ) : (
-                  <Box>
-                    {groups.map((group) => (
+                  <Box sx={{ height: 600, width: '100%' }}>
+                    {groups.map((group, index) => (
                       <Box
                         key={group.id}
+                        draggable={!isGlobalLocked}
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, index)}
+                        onDragEnd={handleDragEnd}
                         onClick={() => {
                           setSelectedGroup(group.id);
                           setSelectedClass('');
                           setSelectedSubClass('');
                           setSelectedDetail('');
+                          setShowAllGroups(false);
                         }}
+                        onContextMenu={(e) => handleContextMenu(e, 'group', group)}
                         sx={{
                           p: 1,
                           mb: 0.5,
                           border: selectedGroup === group.id ? '2px solid' : '1px solid',
                           borderColor: selectedGroup === group.id ? 'primary.main' : 'divider',
                           borderRadius: 1,
-                          cursor: 'pointer',
+                          cursor: isGlobalLocked ? 'default' : 'pointer',
                           bgcolor: selectedGroup === group.id ? 'primary.light' : 'transparent',
+                          opacity: draggedIndex === index ? 0.5 : 1,
+                          transform: draggedIndex === index ? 'rotate(5deg)' : 'none',
+                          boxShadow: draggedIndex === index ? 3 : 0,
                           '&:hover': {
                             bgcolor: selectedGroup === group.id ? 'primary.light' : 'action.hover'
                           },
-                          transition: 'all 0.2s'
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          position: 'relative'
                         }}
                       >
-                        <Box display="flex" alignItems="center" gap={0.5}>
-                          <Chip label={group.code} size="small" color="primary" sx={{ fontSize: '0.7rem', height: 20 }} />
+                        <Box display="flex" alignItems="center" gap={0.5} sx={{ flex: 1 }}>
+                          {!isGlobalLocked && (
+                            <DragIndicator 
+                              fontSize="small" 
+                              sx={{ 
+                                color: 'grey.400', 
+                                cursor: 'grab',
+                                '&:active': { cursor: 'grabbing' }
+                              }} 
+                            />
+                          )}
+                          <Chip 
+                            label={group.code} 
+                            size="small" 
+                            color="primary" 
+                            sx={{ fontSize: '0.7rem', height: 20 }} 
+                          />
                           <Typography sx={{ 
                             fontFamily: 'Vazirmatn, Arial, sans-serif',
                             fontWeight: selectedGroup === group.id ? 'bold' : 'normal',
-                            fontSize: '0.8rem'
+                            fontSize: '0.8rem',
+                            flex: 1
                           }}>
                             {group.name}
                           </Typography>
                         </Box>
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Tooltip title={isGlobalLocked ? "همه گروه‌ها قفل هستند" : "همه گروه‌ها باز هستند"}>
+                            <Box sx={{ p: 0.5, opacity: 0.7 }}>
+                              {isGlobalLocked ? <Lock fontSize="small" color="warning" /> : <LockOpen fontSize="small" color="success" />}
+                            </Box>
+                          </Tooltip>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleContextMenu(e, 'group', group);
+                            }}
+                            sx={{ p: 0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}
+                          >
+                            <MoreVert fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </Box>
                     ))}
+                    
+                    {/* All Groups Option */}
+                    <Box
+                      onClick={() => {
+                        setShowAllGroups(true);
+                        setSelectedGroup('');
+                        setSelectedClass('');
+                        setSelectedSubClass('');
+                        setSelectedDetail('');
+                      }}
+                      sx={{
+                        p: 1,
+                        mt: 1,
+                        border: showAllGroups ? '2px solid' : '1px solid',
+                        borderColor: showAllGroups ? 'primary.main' : 'divider',
+                        borderRadius: 1,
+                        cursor: 'pointer',
+                        bgcolor: showAllGroups ? 'primary.light' : 'transparent',
+                        '&:hover': {
+                          bgcolor: showAllGroups ? 'primary.light' : 'action.hover'
+                        },
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderTop: '2px solid',
+                        borderTopColor: 'divider',
+                        position: 'relative'
+                      }}
+                    >
+                      <Box display="flex" alignItems="center" gap={0.5} sx={{ flex: 1 }}>
+                        <Chip 
+                          label="همه" 
+                          size="small" 
+                          color="info" 
+                          sx={{ fontSize: '0.7rem', height: 20 }} 
+                        />
+                        <Typography sx={{ 
+                          fontFamily: 'Vazirmatn, Arial, sans-serif',
+                          fontWeight: showAllGroups ? 'bold' : 'normal',
+                          fontSize: '0.8rem',
+                          flex: 1
+                        }}>
+                          همه گروه‌ها
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Box>
                 )}
               </Box>
@@ -832,7 +1155,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
 
         {/* Class Column */}
         <Grid size={{ xs: 12, md: 3 }}>
-          <Card sx={{ height: '500px' }}>
+          <Card sx={{ height: '700px' }}>
             <CardContent 
               sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
             >
@@ -856,7 +1179,72 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
               </Box>
               
               <Box sx={{ flex: 1, overflow: 'auto' }}>
-                {!selectedGroup ? (
+                {showAllGroups ? (
+                  <Box>
+                    {getAllClasses().map((accountClass) => (
+                      <Box
+                        key={accountClass.id}
+                        onClick={() => {
+                          setSelectedClass(accountClass.id);
+                          setSelectedSubClass('');
+                          setSelectedDetail('');
+                        }}
+                        onContextMenu={(e) => handleContextMenu(e, 'class', accountClass)}
+                        sx={{
+                          p: 1,
+                          mb: 0.5,
+                          border: selectedClass === accountClass.id ? '2px solid' : '1px solid',
+                          borderColor: selectedClass === accountClass.id ? 'secondary.main' : 'divider',
+                          borderRadius: 1,
+                          cursor: 'pointer',
+                          bgcolor: selectedClass === accountClass.id ? 'secondary.light' : 'transparent',
+                          '&:hover': {
+                            bgcolor: selectedClass === accountClass.id ? 'secondary.light' : 'action.hover'
+                          },
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Chip 
+                            label={`${accountClass.groupCode}${accountClass.code}`} 
+                            size="small" 
+                            color="secondary" 
+                            sx={{ fontSize: '0.7rem', height: 20 }} 
+                          />
+                          <Box>
+                            <Typography sx={{ 
+                              fontFamily: 'Vazirmatn, Arial, sans-serif',
+                              fontWeight: selectedClass === accountClass.id ? 'bold' : 'normal',
+                              fontSize: '0.8rem'
+                            }}>
+                              {accountClass.name}
+                            </Typography>
+                            <Typography sx={{ 
+                              fontFamily: 'Vazirmatn, Arial, sans-serif',
+                              fontSize: '0.7rem',
+                              color: 'text.secondary'
+                            }}>
+                              {accountClass.groupName}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleContextMenu(e, 'class', accountClass);
+                          }}
+                          sx={{ p: 0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}
+                        >
+                          <MoreVert fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : !selectedGroup ? (
                   <Typography variant="caption" color="text.secondary" sx={{ 
                     fontFamily: 'Vazirmatn, Arial, sans-serif',
                     textAlign: 'center',
@@ -938,7 +1326,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
 
         {/* SubClass Column */}
         <Grid size={{ xs: 12, md: 3 }}>
-          <Card sx={{ height: '500px' }}>
+          <Card sx={{ height: '700px' }}>
             <CardContent 
               sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
             >
@@ -962,7 +1350,71 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
               </Box>
               
               <Box sx={{ flex: 1, overflow: 'auto' }}>
-                {!selectedClass ? (
+                {showAllGroups ? (
+                  <Box>
+                    {getAllSubClasses().map((subClass) => (
+                      <Box
+                        key={subClass.id}
+                        onClick={() => {
+                          setSelectedSubClass(subClass.id);
+                          setSelectedDetail('');
+                        }}
+                        onContextMenu={(e) => handleContextMenu(e, 'subclass', subClass)}
+                        sx={{
+                          p: 1,
+                          mb: 0.5,
+                          border: selectedSubClass === subClass.id ? '2px solid' : '1px solid',
+                          borderColor: selectedSubClass === subClass.id ? 'success.main' : 'divider',
+                          borderRadius: 1,
+                          cursor: 'pointer',
+                          bgcolor: selectedSubClass === subClass.id ? 'success.light' : 'transparent',
+                          '&:hover': {
+                            bgcolor: selectedSubClass === subClass.id ? 'success.light' : 'action.hover'
+                          },
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Chip 
+                            label={`${subClass.groupCode}${subClass.classCode}${subClass.code}`} 
+                            size="small" 
+                            color="success" 
+                            sx={{ fontSize: '0.7rem', height: 20 }} 
+                          />
+                          <Box>
+                            <Typography sx={{ 
+                              fontFamily: 'Vazirmatn, Arial, sans-serif',
+                              fontWeight: selectedSubClass === subClass.id ? 'bold' : 'normal',
+                              fontSize: '0.8rem'
+                            }}>
+                              {subClass.name}
+                            </Typography>
+                            <Typography sx={{ 
+                              fontFamily: 'Vazirmatn, Arial, sans-serif',
+                              fontSize: '0.7rem',
+                              color: 'text.secondary'
+                            }}>
+                              {subClass.groupName} - {subClass.className}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleContextMenu(e, 'subclass', subClass);
+                          }}
+                          sx={{ p: 0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}
+                        >
+                          <MoreVert fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : !selectedClass ? (
                   <Typography variant="caption" color="text.secondary" sx={{ 
                     fontFamily: 'Vazirmatn, Arial, sans-serif',
                     textAlign: 'center',
@@ -1043,7 +1495,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
 
         {/* Detail Column */}
         <Grid size={{ xs: 12, md: 3 }}>
-          <Card sx={{ height: '500px' }}>
+          <Card sx={{ height: '700px' }}>
             <CardContent 
               sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
             >
@@ -1067,7 +1519,68 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
               </Box>
               
               <Box sx={{ flex: 1, overflow: 'auto' }}>
-                {!selectedSubClass ? (
+                {showAllGroups ? (
+                  <Box>
+                    {getAllDetails().map((detail) => (
+                      <Box
+                        key={detail.id}
+                        onClick={() => setSelectedDetail(detail.id)}
+                        onContextMenu={(e) => handleContextMenu(e, 'detail', detail)}
+                        sx={{
+                          p: 1,
+                          mb: 0.5,
+                          border: selectedDetail === detail.id ? '2px solid' : '1px solid',
+                          borderColor: selectedDetail === detail.id ? 'warning.main' : 'divider',
+                          borderRadius: 1,
+                          cursor: 'pointer',
+                          bgcolor: selectedDetail === detail.id ? 'warning.light' : 'transparent',
+                          '&:hover': {
+                            bgcolor: selectedDetail === detail.id ? 'warning.light' : 'action.hover'
+                          },
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Chip 
+                            label={`${detail.groupCode}${detail.classCode}${detail.subClassCode}${detail.code}`} 
+                            size="small" 
+                            color="warning" 
+                            sx={{ fontSize: '0.7rem', height: 20 }} 
+                          />
+                          <Box>
+                            <Typography sx={{ 
+                              fontFamily: 'Vazirmatn, Arial, sans-serif',
+                              fontWeight: selectedDetail === detail.id ? 'bold' : 'normal',
+                              fontSize: '0.8rem'
+                            }}>
+                              {detail.name}
+                            </Typography>
+                            <Typography sx={{ 
+                              fontFamily: 'Vazirmatn, Arial, sans-serif',
+                              fontSize: '0.7rem',
+                              color: 'text.secondary'
+                            }}>
+                              {detail.groupName} - {detail.className} - {detail.subClassName}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleContextMenu(e, 'detail', detail);
+                          }}
+                          sx={{ p: 0.5, opacity: 0.7, '&:hover': { opacity: 1 } }}
+                        >
+                          <MoreVert fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : !selectedSubClass ? (
                   <Typography variant="caption" color="text.secondary" sx={{ 
                     fontFamily: 'Vazirmatn, Arial, sans-serif',
                     textAlign: 'center',
@@ -1318,6 +1831,23 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
             : undefined
         }
       >
+        {contextMenu?.type === 'group' && [
+          !isGlobalLocked && (
+            <MenuItem key="edit-group" onClick={() => handleContextMenuAction('edit-group')}>
+              ویرایش گروه
+            </MenuItem>
+          ),
+          !isGlobalLocked && (
+            <MenuItem key="delete-group" onClick={() => handleContextMenuAction('delete-group')} sx={{ color: 'error.main' }}>
+              حذف گروه
+            </MenuItem>
+          ),
+          isGlobalLocked && (
+            <MenuItem key="locked-message" disabled sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+              گروه‌ها قفل هستند - ابتدا قفل را باز کنید
+            </MenuItem>
+          )
+        ]}
         {contextMenu?.type === 'class' && [
           <MenuItem key="edit-class" onClick={() => handleContextMenuAction('edit-class')}>
             ویرایش سرفصل کل
@@ -1347,10 +1877,33 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
-          ویرایش {editDialogLevel === 'class' ? 'سرفصل کل' : editDialogLevel === 'subclass' ? 'سرفصل معین' : 'تفصیلی'}
+          ویرایش {editDialogLevel === 'group' ? 'گروه' : editDialogLevel === 'class' ? 'سرفصل کل' : editDialogLevel === 'subclass' ? 'سرفصل معین' : 'تفصیلی'}
         </DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
+            {editDialogLevel === 'group' && (
+              <>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <SimpleCodeInput
+                    value={newGroupCode}
+                    onChange={setNewGroupCode}
+                    maxLength={1}
+                    placeholder="1"
+                    error={!validateGroupCode(newGroupCode) && newGroupCode.length > 0}
+                    helperText="عدد 1 تا 9"
+                  />
+                  <TextField
+                    fullWidth
+                    label="نام گروه"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                  />
+                </Box>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+                  کد کامل: {newGroupCode}
+                </Typography>
+              </>
+            )}
             {editDialogLevel === 'class' && (
               <>
                 <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
@@ -1462,6 +2015,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
             onClick={handleEditItem} 
             variant="contained"
             disabled={
+              (editDialogLevel === 'group' && (!newGroupName.trim() || !newGroupCode.trim())) ||
               (editDialogLevel === 'class' && (!newClassName.trim() || !newClassCode.trim())) ||
               (editDialogLevel === 'subclass' && (!newSubClassName.trim() || !newSubClassCode.trim())) ||
               (editDialogLevel === 'detail' && (!newDetailName.trim() || !newDetailCode.trim()))
@@ -1499,6 +2053,22 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Toast Notifications */}
+      <Snackbar
+        open={toastOpen}
+        autoHideDuration={4000}
+        onClose={() => setToastOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert 
+          onClose={() => setToastOpen(false)} 
+          severity={toastSeverity}
+          sx={{ width: '100%' }}
+        >
+          {toastMessage}
+        </Alert>
+      </Snackbar>
 
     </Box>
   );

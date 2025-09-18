@@ -32,6 +32,7 @@ import {
   Cancel as CancelIcon,
   DeleteSweep as DeleteSweepIcon
 } from '@mui/icons-material';
+import PersianDatePicker from '../common/PersianDatePicker';
 
 interface InstallmentDefinition {
   id: string;
@@ -401,15 +402,10 @@ const InstallmentDefinitionsManager: React.FC<InstallmentDefinitionsManagerProps
               sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
             />
             
-            <TextField
-              fullWidth
-              label="تاریخ سررسید"
-              type="date"
+            <PersianDatePicker
               value={formData.dueDate}
-              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              margin="normal"
-              InputLabelProps={{ shrink: true }}
-              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+              onChange={(date) => setFormData({ ...formData, dueDate: date })}
+              label="تاریخ سررسید"
             />
             
             <TextField

@@ -34,6 +34,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { faIR } from 'date-fns/locale';
+import PersianDatePicker from '../common/PersianDatePicker';
 
 interface FinancialData {
   balanceSheet: {
@@ -210,22 +211,20 @@ export default function FinancialReports({ projectId }: FinancialReportsProps) {
           </Typography>
           
           <Box display="flex" gap={2} alignItems="center" mb={2} flexWrap="wrap">
-            <TextField
-              label="از تاریخ"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="تا تاریخ"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              size="small"
-              InputLabelProps={{ shrink: true }}
-            />
+            <Box sx={{ minWidth: 150 }}>
+              <PersianDatePicker
+                value={startDate}
+                onChange={setStartDate}
+                label="از تاریخ"
+              />
+            </Box>
+            <Box sx={{ minWidth: 150 }}>
+              <PersianDatePicker
+                value={endDate}
+                onChange={setEndDate}
+                label="تا تاریخ"
+              />
+            </Box>
             <FormControl size="small" sx={{ minWidth: 200 }}>
               <InputLabel>نوع گزارش</InputLabel>
               <Select

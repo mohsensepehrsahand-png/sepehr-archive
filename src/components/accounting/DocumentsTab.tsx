@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -24,7 +24,8 @@ import {
   InputAdornment,
   Tabs,
   Tab,
-  Badge
+  Badge,
+  Snackbar
 } from '@mui/material';
 import {
   Add,
@@ -36,10 +37,14 @@ import {
   ArrowUpward,
   ArrowDownward,
   CheckCircle,
-  Schedule
+  Schedule,
+  FilterList
 } from '@mui/icons-material';
+import { Switch } from '@mui/material';
 import DocumentModal from './DocumentModal';
 import AccountSelectorModal from './AccountSelectorModal';
+import { useTableFilters, TableFilters } from '@/components/common';
+import DateFilterModal from './DateFilterModal';
 
 interface Document {
   id: string;
@@ -68,23 +73,48 @@ interface DocumentsTabProps {
 
 export default function DocumentsTab({ projectId }: DocumentsTabProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [documentModalOpen, setDocumentModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
+  const [permanentDeleteDialogOpen, setPermanentDeleteDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [statusChangeMessage, setStatusChangeMessage] = useState('');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'warning'>('success');
   
-  // Sorting and filtering states
+  // Sorting states
   const [sortField, setSortField] = useState<keyof Document | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [searchTerm, setSearchTerm] = useState('');
   
   // Sub-tab state
   const [subTabValue, setSubTabValue] = useState(0);
+  
+  // Date filter modal state
+  const [dateFilterModalOpen, setDateFilterModalOpen] = useState(false);
+
+  // Use the new filter hook
+  const {
+    filteredData: filteredDocuments,
+    filters,
+    setSearchTerm,
+    setDateFilter,
+    setCustomFilter,
+    clearAllFilters,
+    hasActiveFilters
+  } = useTableFilters({
+    data: documents,
+    searchFields: ['documentNumber', 'description'],
+    dateField: 'documentDate',
+    customFilterFields: {
+      status: (item: Document, value: string) => {
+        if (value === 'all') return true;
+        return item.status === value;
+      }
+    }
+  });
 
   // Format date for display
   const formatDate = (dateString: string) => {
@@ -108,19 +138,6 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
       setSortField(field);
       setSortDirection('asc');
     }
-  };
-
-  // Filter documents based on search term
-  const filterDocuments = (docs: Document[], search: string) => {
-    if (!search) return docs;
-    
-    return docs.filter(doc => 
-      doc.documentNumber.toLowerCase().includes(search.toLowerCase()) ||
-      doc.description.toLowerCase().includes(search.toLowerCase()) ||
-      formatDate(doc.documentDate).includes(search) ||
-      doc.totalDebit.toString().includes(search) ||
-      doc.totalCredit.toString().includes(search)
-    );
   };
 
   // Filter documents by status based on sub-tab
@@ -177,13 +194,11 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
     fetchDocuments();
   }, [projectId]);
 
-  // Handle filtering and sorting when documents, search term, sort settings, or sub-tab change
-  useEffect(() => {
-    let filtered = filterDocumentsByStatus(documents, subTabValue);
-    filtered = filterDocuments(filtered, searchTerm);
-    filtered = sortDocuments(filtered);
-    setFilteredDocuments(filtered);
-  }, [documents, searchTerm, sortField, sortDirection, subTabValue]);
+  // Apply sub-tab filtering to the already filtered data
+  const finalFilteredDocuments = useMemo(() => {
+    const statusFiltered = filterDocumentsByStatus(filteredDocuments, subTabValue);
+    return sortDocuments(statusFiltered);
+  }, [filteredDocuments, subTabValue, sortField, sortDirection]);
 
   const fetchDocuments = async () => {
     try {
@@ -192,7 +207,6 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
       if (response.ok) {
         const data = await response.json();
         setDocuments(data);
-        setFilteredDocuments(data);
       } else {
         setError('خطا در دریافت اسناد');
       }
@@ -224,7 +238,13 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
 
   const handleDeleteDocument = (document: Document) => {
     setSelectedDocument(document);
-    setDeleteDialogOpen(true);
+    
+    // If document is permanent, show special confirmation dialog
+    if (document.status === 'PERMANENT') {
+      setPermanentDeleteDialogOpen(true);
+    } else {
+      setDeleteDialogOpen(true);
+    }
   };
 
   const confirmDelete = async () => {
@@ -239,8 +259,15 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
         setDocuments(docs => docs.filter(doc => doc.id !== selectedDocument.id));
         setDeleteDialogOpen(false);
         setSelectedDocument(null);
+        
+        // Show success message
+        setStatusChangeMessage(`سند "${selectedDocument.documentNumber}" با موفقیت حذف شد`);
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
       } else {
-        setError('خطا در حذف سند');
+        const errorData = await response.json();
+        console.error('Delete error:', errorData);
+        setError(errorData.error || 'خطا در حذف سند');
       }
     } catch (error) {
       console.error('Error deleting document:', error);
@@ -248,14 +275,7 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
     }
   };
 
-  const handleStatusChange = (document: Document) => {
-    if (document.status === 'TEMPORARY') {
-      setSelectedDocument(document);
-      setStatusChangeDialogOpen(true);
-    }
-  };
-
-  const confirmStatusChange = async () => {
+  const confirmConvertToTemporary = async () => {
     if (!selectedDocument) return;
 
     try {
@@ -264,19 +284,62 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: 'PERMANENT' })
+        body: JSON.stringify({ status: 'TEMPORARY' })
+      });
+
+      if (response.ok) {
+        // Update document status in the list
+        setDocuments(docs => 
+          docs.map(doc => 
+            doc.id === selectedDocument.id 
+              ? { ...doc, status: 'TEMPORARY' as const }
+              : doc
+          )
+        );
+        
+        setPermanentDeleteDialogOpen(false);
+        setSelectedDocument(null);
+        
+        // Show success message
+        setStatusChangeMessage(`سند "${selectedDocument.documentNumber}" به حالت موقت تبدیل شد`);
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'خطا در تبدیل وضعیت سند');
+      }
+    } catch (error) {
+      console.error('Error converting document to temporary:', error);
+      setError('خطا در تبدیل وضعیت سند');
+    }
+  };
+
+  const handleStatusToggle = async (document: Document) => {
+    const newStatus = document.status === 'TEMPORARY' ? 'PERMANENT' : 'TEMPORARY';
+    
+    try {
+      const response = await fetch(`/api/accounting/documents/${document.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus })
       });
 
       if (response.ok) {
         setDocuments(docs => 
           docs.map(doc => 
-            doc.id === selectedDocument.id 
-              ? { ...doc, status: 'PERMANENT' as const }
+            doc.id === document.id 
+              ? { ...doc, status: newStatus as const }
               : doc
           )
         );
-        setStatusChangeDialogOpen(false);
-        setSelectedDocument(null);
+        
+        // Show success message
+        const statusText = newStatus === 'TEMPORARY' ? 'موقت' : 'دائم';
+        setStatusChangeMessage(`سند "${document.documentNumber}" به حالت ${statusText} تبدیل شد`);
+        setSnackbarSeverity(newStatus === 'TEMPORARY' ? 'warning' : 'success');
+        setSnackbarOpen(true);
       } else {
         setError('خطا در تغییر وضعیت سند');
       }
@@ -285,6 +348,7 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
       setError('خطا در تغییر وضعیت سند');
     }
   };
+
 
   const handleSaveDocument = async (documentData: Omit<Document, 'id'>) => {
     try {
@@ -348,6 +412,7 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
         </Alert>
       )}
 
+
       {/* Sub-tabs and Add Button in same row */}
       <Box display="flex" alignItems="center" mb={3} sx={{ direction: 'rtl' }}>
         <Button
@@ -407,7 +472,7 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
         <TextField
           fullWidth
           placeholder="جستجو در اسناد (شماره سند، توضیحات، تاریخ، مبالغ)..."
-          value={searchTerm}
+          value={filters.searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{
             startAdornment: (
@@ -421,9 +486,9 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
       </Box>
 
       <TableContainer component={Paper}>
-        <Table>
+        <Table size="small">
           <TableHead>
-            <TableRow>
+            <TableRow sx={{ '& .MuiTableCell-root': { py: 1 } }}>
               <TableCell sx={{ textAlign: 'center' }}>ردیف</TableCell>
               <TableCell sx={{ textAlign: 'center' }}>
                 <TableSortLabel
@@ -436,14 +501,31 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
                 </TableSortLabel>
               </TableCell>
               <TableCell sx={{ textAlign: 'center' }}>
-                <TableSortLabel
-                  active={sortField === 'documentDate'}
-                  direction={sortField === 'documentDate' ? sortDirection : 'asc'}
-                  onClick={() => handleSort('documentDate')}
-                  sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
-                >
-                  تاریخ سند
-                </TableSortLabel>
+                <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
+                  <TableSortLabel
+                    active={sortField === 'documentDate'}
+                    direction={sortField === 'documentDate' ? sortDirection : 'asc'}
+                    onClick={() => handleSort('documentDate')}
+                    sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+                  >
+                    تاریخ سند
+                  </TableSortLabel>
+                  <Tooltip title="فیلتر تاریخ">
+                    <IconButton 
+                      size="small" 
+                      onClick={() => setDateFilterModalOpen(true)}
+                      sx={{ 
+                        p: 0.5,
+                        color: filters.dateFilter ? 'primary.main' : 'text.secondary',
+                        '&:hover': {
+                          backgroundColor: 'action.hover'
+                        }
+                      }}
+                    >
+                      <FilterList fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
               </TableCell>
               <TableCell sx={{ textAlign: 'center' }}>
                 <TableSortLabel
@@ -489,8 +571,8 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredDocuments.map((document, index) => (
-              <TableRow key={document.id}>
+            {finalFilteredDocuments.map((document, index) => (
+              <TableRow key={document.id} sx={{ '& .MuiTableCell-root': { py: 0.5 } }}>
                 <TableCell sx={{ textAlign: 'center' }}>{index + 1}</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>{document.documentNumber}</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>{formatDate(document.documentDate)}</TableCell>
@@ -510,11 +592,37 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
                   />
                 </TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>
-                  <Chip
-                    label={document.status === 'TEMPORARY' ? 'موقت' : 'دائم'}
-                    color={document.status === 'TEMPORARY' ? 'warning' : 'success'}
-                    icon={document.status === 'TEMPORARY' ? <Schedule /> : <CheckCircle />}
-                    size="small"
+                  <Switch
+                    checked={document.status === 'PERMANENT'}
+                    onChange={() => handleStatusToggle(document)}
+                    color="success"
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#4caf50', // Green color
+                        '& + .MuiSwitch-track': {
+                          backgroundColor: '#4caf50',
+                        },
+                      },
+                      '& .MuiSwitch-switchBase': {
+                        color: '#ff9800', // Yellow/Orange color
+                        '& + .MuiSwitch-track': {
+                          backgroundColor: '#ff9800',
+                        },
+                      },
+                      '& .MuiSwitch-thumb': {
+                        '&::before': {
+                          content: `"${document.status === 'TEMPORARY' ? 'موقت' : 'دائم'}"`,
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          color: 'white',
+                          fontFamily: 'Vazirmatn, Arial, sans-serif',
+                        },
+                      },
+                    }}
                   />
                 </TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>
@@ -545,27 +653,16 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
                       <Delete />
                     </IconButton>
                   </Tooltip>
-                  {document.status === 'TEMPORARY' && (
-                    <Tooltip title="تبدیل به دائم">
-                      <IconButton 
-                        size="small" 
-                        onClick={() => handleStatusChange(document)}
-                        color="success"
-                      >
-                        <CheckCircle />
-                      </IconButton>
-                    </Tooltip>
-                  )}
                 </TableCell>
               </TableRow>
             ))}
-            {filteredDocuments.length === 0 && (
-              <TableRow>
+            {finalFilteredDocuments.length === 0 && (
+              <TableRow sx={{ '& .MuiTableCell-root': { py: 1 } }}>
                 <TableCell colSpan={8} align="center">
                   <Box py={4}>
                     <Receipt sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
                     <Typography variant="body1" color="text.secondary">
-                      {searchTerm ? 'هیچ سندی با این جستجو یافت نشد' : 'هیچ سندی یافت نشد'}
+                      {filters.searchTerm ? 'هیچ سندی با این جستجو یافت نشد' : 'هیچ سندی یافت نشد'}
                     </Typography>
                   </Box>
                 </TableCell>
@@ -678,27 +775,76 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
       </Dialog>
 
       <Dialog
-        open={statusChangeDialogOpen}
-        onClose={() => setStatusChangeDialogOpen(false)}
+        open={permanentDeleteDialogOpen}
+        onClose={() => setPermanentDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
       >
-        <DialogTitle>تبدیل به سند دائم</DialogTitle>
+        <DialogTitle sx={{ color: 'warning.main', fontWeight: 'bold' }}>
+          ⚠️ تبدیل سند دائم به موقت
+        </DialogTitle>
         <DialogContent>
-          <Typography>
-            آیا می‌خواهید سند "{selectedDocument?.documentNumber}" را به سند دائم تبدیل کنید؟
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            پس از تبدیل به دائم، این سند دیگر قابل ویرایش نخواهد بود.
-          </Typography>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body1" sx={{ mb: 2, fontWeight: 'bold' }}>
+              سند "{selectedDocument?.documentNumber}" در حالت دائم است و قابل حذف مستقیم نیست.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              برای حذف این سند، ابتدا باید آن را به حالت موقت تبدیل کنید.
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'warning.dark' }}>
+              آیا می‌خواهید این سند را به حالت موقت تبدیل کنید؟
+            </Typography>
+          </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setStatusChangeDialogOpen(false)}>
+          <Button 
+            onClick={() => setPermanentDeleteDialogOpen(false)}
+            variant="outlined"
+          >
             لغو
           </Button>
-          <Button onClick={confirmStatusChange} color="success" variant="contained">
-            تبدیل به دائم
+          <Button 
+            onClick={confirmConvertToTemporary} 
+            color="warning" 
+            variant="contained"
+            sx={{ fontWeight: 'bold' }}
+          >
+            تبدیل به موقت
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert 
+          severity={snackbarSeverity}
+          onClose={() => setSnackbarOpen(false)}
+          sx={{ 
+            width: '100%',
+            fontFamily: 'Vazirmatn, Arial, sans-serif',
+            '& .MuiAlert-message': {
+              fontWeight: 'bold'
+            },
+            '& .MuiAlert-icon': {
+              fontSize: '20px'
+            }
+          }}
+        >
+          {statusChangeMessage}
+        </Alert>
+      </Snackbar>
+
+      <DateFilterModal
+        open={dateFilterModalOpen}
+        onClose={() => setDateFilterModalOpen(false)}
+        onApply={setDateFilter}
+        currentFilter={filters.dateFilter}
+      />
+
     </Box>
   );
 }

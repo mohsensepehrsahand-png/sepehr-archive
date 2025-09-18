@@ -39,6 +39,7 @@ import {
   ExpandLess,
   FilterList
 } from '@mui/icons-material';
+import PersianDatePicker from '../common/PersianDatePicker';
 
 interface Account {
   id: string;
@@ -449,22 +450,20 @@ export default function Daybook({ projectId }: DaybookProps) {
                   )
                 }}
               />
-                <TextField
-                  sx={{ minWidth: 150 }}
-                  type="date"
-                  label="از تاریخ"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              <TextField
-                  sx={{ minWidth: 150 }}
-                type="date"
-                  label="تا تاریخ"
+                <Box sx={{ minWidth: 150 }}>
+                  <PersianDatePicker
+                    value={dateFrom}
+                    onChange={setDateFrom}
+                    label="از تاریخ"
+                  />
+                </Box>
+              <Box sx={{ minWidth: 150 }}>
+                <PersianDatePicker
                   value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
+                  onChange={setDateTo}
+                  label="تا تاریخ"
+                />
+              </Box>
                 <TextField
                   sx={{ minWidth: 150 }}
                   label="از شماره سند"

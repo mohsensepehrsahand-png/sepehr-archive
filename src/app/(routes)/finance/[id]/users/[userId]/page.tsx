@@ -37,6 +37,7 @@ import SummaryCard from "@/components/finance/SummaryCard";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import PenaltySettingsManager from "@/components/finance/PenaltySettingsManager";
 import InstallmentTable from "@/components/finance/InstallmentTable";
+import PersianDatePicker from "@/components/common/PersianDatePicker";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -904,27 +905,16 @@ function InstallmentForm({
         sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
       />
       
-      <TextField
-        fullWidth
-        label="تاریخ سررسید"
-        type="date"
+      <PersianDatePicker
         value={formData.dueDate}
-        onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-        margin="normal"
-        required
-        InputLabelProps={{ shrink: true }}
-        sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+        onChange={(date) => setFormData({ ...formData, dueDate: date })}
+        label="تاریخ سررسید"
       />
       
-      <TextField
-        fullWidth
-        label="تاریخ پرداخت"
-        type="date"
+      <PersianDatePicker
         value={formData.paymentDate}
-        onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
-        margin="normal"
-        InputLabelProps={{ shrink: true }}
-        sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+        onChange={(date) => setFormData({ ...formData, paymentDate: date })}
+        label="تاریخ پرداخت"
       />
       
       <DialogActions sx={{ mt: 3 }}>

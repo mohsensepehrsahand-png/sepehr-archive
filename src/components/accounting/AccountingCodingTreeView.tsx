@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -16,7 +16,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Alert
+  Alert,
+  Menu,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import { TreeView, TreeItem } from '@mui/lab';
 import {
@@ -110,6 +113,18 @@ export default function AccountingCodingTreeView({
     code: string;
   } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    targetType: 'group' | 'class' | 'subclass' | 'detail';
+    targetId: string;
+    targetName: string;
+    targetCode: string;
+    isProtected: boolean;
+  } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const handleDeleteClick = (
     type: 'group' | 'class' | 'subclass' | 'detail',
@@ -145,6 +160,66 @@ export default function AccountingCodingTreeView({
     setConfirmDelete(false);
   };
 
+  const handleContextMenu = (event: React.MouseEvent, targetType: 'group' | 'class' | 'subclass' | 'detail', targetId: string, targetName: string, targetCode: string, isProtected: boolean) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    setContextMenu({
+      mouseX: event.clientX + 2,
+      mouseY: event.clientY - 6,
+      targetType,
+      targetId,
+      targetName,
+      targetCode,
+      isProtected
+    });
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  const handleContextMenuAction = (action: 'edit' | 'delete' | 'add') => {
+    if (!contextMenu) return;
+
+    switch (action) {
+      case 'edit':
+        switch (contextMenu.targetType) {
+          case 'group':
+            onEditGroup(contextMenu.targetId);
+            break;
+          case 'class':
+            onEditClass(contextMenu.targetId);
+            break;
+          case 'subclass':
+            onEditSubClass(contextMenu.targetId);
+            break;
+          case 'detail':
+            onEditDetail(contextMenu.targetId);
+            break;
+        }
+        break;
+      case 'delete':
+        handleDeleteClick(contextMenu.targetType, contextMenu.targetId, contextMenu.targetName, contextMenu.targetCode);
+        break;
+      case 'add':
+        switch (contextMenu.targetType) {
+          case 'group':
+            onAddClass(contextMenu.targetId);
+            break;
+          case 'class':
+            onAddSubClass(contextMenu.targetId);
+            break;
+          case 'subclass':
+            onAddDetail(contextMenu.targetId);
+            break;
+        }
+        break;
+    }
+    
+    handleCloseContextMenu();
+  };
+
   const getNatureColor = (nature: string) => {
     switch (nature) {
       case 'DEBIT':
@@ -173,7 +248,17 @@ export default function AccountingCodingTreeView({
 
   const renderTreeItem = (group: AccountGroup) => {
     const groupLabel = (
-      <Box display="flex" alignItems="center" gap={1} width="100%">
+      <Box 
+        display="flex" 
+        alignItems="center" 
+        gap={1} 
+        width="100%"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleContextMenu(e, 'group', group.id, group.name, group.code, group.isProtected);
+        }}
+      >
         <Typography variant="body2" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', flex: 1 }}>
           {group.code} - {group.name}
         </Typography>
@@ -217,10 +302,24 @@ export default function AccountingCodingTreeView({
     );
 
     return (
-      <TreeItem key={group.id} nodeId={group.id} label={groupLabel}>
+      <TreeItem 
+        key={group.id} 
+        nodeId={group.id} 
+        label={groupLabel}
+      >
         {group.classes.map((accountClass) => {
           const classLabel = (
-            <Box display="flex" alignItems="center" gap={1} width="100%">
+            <Box 
+              display="flex" 
+              alignItems="center" 
+              gap={1} 
+              width="100%"
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleContextMenu(e, 'class', accountClass.id, accountClass.name, `${group.code}${accountClass.code}`, accountClass.isProtected);
+              }}
+            >
               <Typography variant="body2" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', flex: 1 }}>
                 {group.code}{accountClass.code} - {accountClass.name}
               </Typography>
@@ -269,10 +368,24 @@ export default function AccountingCodingTreeView({
           );
 
           return (
-            <TreeItem key={accountClass.id} nodeId={accountClass.id} label={classLabel}>
+            <TreeItem 
+              key={accountClass.id} 
+              nodeId={accountClass.id} 
+              label={classLabel}
+            >
               {accountClass.subClasses.map((subClass) => {
                 const subClassLabel = (
-                  <Box display="flex" alignItems="center" gap={1} width="100%">
+                  <Box 
+                    display="flex" 
+                    alignItems="center" 
+                    gap={1} 
+                    width="100%"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleContextMenu(e, 'subclass', subClass.id, subClass.name, `${group.code}${accountClass.code}${subClass.code}`, subClass.isProtected);
+                    }}
+                  >
                     <Typography variant="body2" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', flex: 1 }}>
                       {group.code}{accountClass.code}{subClass.code} - {subClass.name}
                     </Typography>
@@ -321,10 +434,24 @@ export default function AccountingCodingTreeView({
                 );
 
                 return (
-                  <TreeItem key={subClass.id} nodeId={subClass.id} label={subClassLabel}>
+                  <TreeItem 
+                    key={subClass.id} 
+                    nodeId={subClass.id} 
+                    label={subClassLabel}
+                  >
                     {subClass.details.map((detail) => {
                       const detailLabel = (
-                        <Box display="flex" alignItems="center" gap={1} width="100%">
+                        <Box 
+                          display="flex" 
+                          alignItems="center" 
+                          gap={1} 
+                          width="100%"
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleContextMenu(e, 'detail', detail.id, detail.name, `${group.code}${accountClass.code}${subClass.code}${detail.code}`, detail.isProtected);
+                          }}
+                        >
                           <Typography variant="body2" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', flex: 1 }}>
                             {group.code}{accountClass.code}{subClass.code}{detail.code} - {detail.name}
                           </Typography>
@@ -463,6 +590,54 @@ export default function AccountingCodingTreeView({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Context Menu */}
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleCloseContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+        ref={contextMenuRef}
+        sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+      >
+        {contextMenu && (
+          <>
+            <MenuItem onClick={() => handleContextMenuAction('add')} sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+              <ListItemIcon>
+                <Add fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>
+                {contextMenu.targetType === 'group' && 'افزودن کل'}
+                {contextMenu.targetType === 'class' && 'افزودن معین'}
+                {contextMenu.targetType === 'subclass' && 'افزودن تفصیلی'}
+              </ListItemText>
+            </MenuItem>
+            {!contextMenu.isProtected && (
+              <>
+                <MenuItem onClick={() => handleContextMenuAction('edit')} sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                  <ListItemIcon>
+                    <Edit fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>ویرایش</ListItemText>
+                </MenuItem>
+                <MenuItem 
+                  onClick={() => handleContextMenuAction('delete')} 
+                  sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', color: 'error.main' }}
+                >
+                  <ListItemIcon>
+                    <Delete fontSize="small" color="error" />
+                  </ListItemIcon>
+                  <ListItemText>حذف</ListItemText>
+                </MenuItem>
+              </>
+            )}
+          </>
+        )}
+      </Menu>
     </Box>
   );
 }

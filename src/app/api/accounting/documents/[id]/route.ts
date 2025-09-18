@@ -78,6 +78,50 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     const documentId = params.id;
 
+    // Get user role from cookies
+    const userRole = request.cookies.get('userRole')?.value;
+    const userId = request.cookies.get('userData')?.value ? 
+      JSON.parse(request.cookies.get('userData')?.value || '{}').id : null;
+
+    // Only admin users can delete documents
+    if (userRole !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'شما مجوز حذف سند ندارید' },
+        { status: 403 }
+      );
+    }
+
+    // Get document info before deletion
+    const document = await prisma.accountingDocument.findUnique({
+      where: { id: documentId },
+      include: {
+        project: {
+          select: {
+            name: true
+          }
+        }
+      }
+    });
+
+    if (!document) {
+      return NextResponse.json(
+        { error: 'سند یافت نشد' },
+        { status: 404 }
+      );
+    }
+
+    // If document is permanent, return error
+    if (document.status === 'PERMANENT') {
+      return NextResponse.json(
+        { 
+          error: 'اسناد دایم قابل حذف نیستند',
+          canConvertToTemporary: true,
+          message: 'آیا می‌خواهید این سند را به حالت موقت تبدیل کنید؟'
+        },
+        { status: 400 }
+      );
+    }
+
     // Delete entries first (due to foreign key constraint)
     await prisma.accountingEntry.deleteMany({
       where: {
@@ -91,6 +135,8 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         id: documentId
       }
     });
+
+    // TODO: Add activity logging here if needed
 
     return NextResponse.json({ success: true });
   } catch (error) {

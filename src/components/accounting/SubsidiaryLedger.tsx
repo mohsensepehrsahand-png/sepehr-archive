@@ -74,6 +74,8 @@ export default function SubsidiaryLedger({ projectId }: Props) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showAllSubsidiaries, setShowAllSubsidiaries] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [shouldGenerateTables, setShouldGenerateTables] = useState(false);
 
   useEffect(() => {
     fetchInitial();
@@ -87,6 +89,7 @@ export default function SubsidiaryLedger({ projectId }: Props) {
       const data = await res.json();
       setGroups(data);
     } catch (e) {
+      console.error('Error fetching groups:', e);
       setError(e instanceof Error ? e.message : 'خطا');
     } finally {
       setLoading(false);
@@ -94,12 +97,33 @@ export default function SubsidiaryLedger({ projectId }: Props) {
   };
 
   useEffect(() => {
-    buildRows();
-  }, [selectedSubsidiaries, dateFrom, dateTo, showAllSubsidiaries]);
+    // Only generate tables when shouldGenerateTables is true
+    if (shouldGenerateTables) {
+      buildRows();
+      setShouldGenerateTables(false);
+    }
+  }, [shouldGenerateTables]);
 
   const selectedCodes = useMemo(() => {
     return Object.keys(selectedSubsidiaries).filter(k => selectedSubsidiaries[k]);
   }, [selectedSubsidiaries]);
+
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return groups;
+    }
+    
+    return groups.map(group => ({
+      ...group,
+      classes: group.classes?.map(cls => ({
+        ...cls,
+        subClasses: cls.subClasses?.filter(sub => 
+          sub.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          `${group.code}${cls.code}${sub.code}`.includes(searchQuery)
+        )
+      })).filter(cls => cls.subClasses && cls.subClasses.length > 0)
+    })).filter(group => group.classes && group.classes.length > 0);
+  }, [groups, searchQuery]);
 
   const buildRows = async () => {
     try {
@@ -263,13 +287,34 @@ export default function SubsidiaryLedger({ projectId }: Props) {
   };
 
   const toggleSub = (fullCode: string) => {
-    setSelectedSubsidiaries(prev => ({ ...prev, [fullCode]: !prev[fullCode] }));
+    setSelectedSubsidiaries(prev => {
+      const newState = { ...prev, [fullCode]: !prev[fullCode] };
+      return newState;
+    });
   };
 
   const handleCheckboxChange = (fullCode: string, event: React.ChangeEvent<HTMLInputElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
     toggleSub(fullCode);
+  };
+
+  const removeSelectedAccount = (fullCode: string) => {
+    setSelectedSubsidiaries(prev => ({ ...prev, [fullCode]: false }));
+  };
+
+  const getAccountName = (fullCode: string) => {
+    for (const group of groups) {
+      for (const cls of group.classes || []) {
+        for (const sub of cls.subClasses || []) {
+          if (`${group.code}${cls.code}${sub.code}` === fullCode) {
+            return sub.name;
+          }
+        }
+      }
+    }
+    return fullCode;
   };
 
   const calculateRunningBalances = (rows: LedgerRow[]) => {
@@ -462,6 +507,7 @@ export default function SubsidiaryLedger({ projectId }: Props) {
     );
   }
 
+
   return (
     <Box>
       {error && (
@@ -475,11 +521,12 @@ export default function SubsidiaryLedger({ projectId }: Props) {
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <Box display="flex" gap={1} alignItems="center">
               {/* Dropdown selector with sticky subheaders */}
-              <Box sx={{ minWidth: 240 }}>
+              <Box sx={{ width: '7cm' }}>
                 <Button
                   variant="outlined"
                   onClick={(e) => setAnchorEl(e.currentTarget)}
                   endIcon={anchorEl ? <ExpandLess /> : <ExpandMore />}
+                  sx={{ width: '100%', justifyContent: 'space-between' }}
                 >
                   {selectedCodes.length > 0 ? `انتخاب شده: ${selectedCodes.length}` : 'انتخاب حساب‌های معین'}
                 </Button>
@@ -487,12 +534,73 @@ export default function SubsidiaryLedger({ projectId }: Props) {
                   open={Boolean(anchorEl)}
                   anchorEl={anchorEl}
                   onClose={() => setAnchorEl(null)}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                  PaperProps={{ sx: { width: '25%', minWidth: 300 } }}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+                  PaperProps={{ 
+                    sx: { 
+                      width: '100%',
+                      minWidth: 800,
+                      maxWidth: '90vw',
+                      maxHeight: 500,
+                      overflow: 'hidden'
+                    }
+                  }}
                 >
-                  <Box sx={{ maxHeight: 360, overflow: 'auto' }}>
-                    {groups.map(group => (
+                  <Box sx={{ p: 2, borderBottom: '1px solid #eee' }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="جستجو در حساب‌های معین..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', mb: 2 }}
+                    />
+                    {selectedCodes.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" sx={{ 
+                          fontFamily: 'Vazirmatn, Arial, sans-serif', 
+                          fontWeight: 'bold', 
+                          mb: 1,
+                          color: '#1976d2'
+                        }}>
+                          حساب‌های انتخاب شده:
+                        </Typography>
+                        <Box sx={{ 
+                          maxHeight: 120, 
+                          overflow: 'auto', 
+                          border: '1px solid #e0e0e0', 
+                          borderRadius: 1, 
+                          p: 1,
+                          backgroundColor: '#f9f9f9'
+                        }}>
+                          {selectedCodes.map(code => (
+                            <Chip
+                              key={code}
+                              label={`${getAccountName(code)} (${code})`}
+                              onDelete={() => removeSelectedAccount(code)}
+                              size="small"
+                              sx={{ 
+                                m: 0.5,
+                                fontFamily: 'Vazirmatn, Arial, sans-serif',
+                                '& .MuiChip-deleteIcon': {
+                                  fontSize: '16px'
+                                }
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
+                  <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                    {filteredGroups.length === 0 && (
+                      <Box sx={{ p: 2, textAlign: 'center' }}>
+                        <Typography variant="body2" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                          {loading ? 'در حال بارگذاری...' : 'هیچ حسابی یافت نشد'}
+                        </Typography>
+                      </Box>
+                    )}
+                    {filteredGroups.map(group => (
                       <Box key={group.id}>
                         {group.classes?.map(cls => (
                           <Box key={cls.id}>
@@ -521,6 +629,18 @@ export default function SubsidiaryLedger({ projectId }: Props) {
                   </Box>
                 </Popover>
               </Box>
+              
+              <Button
+                variant="contained"
+                onClick={() => setShouldGenerateTables(true)}
+                disabled={selectedCodes.length === 0}
+                sx={{ 
+                  fontFamily: 'Vazirmatn, Arial, sans-serif',
+                  width: '7cm'
+                }}
+              >
+                تایید و دیدن دفتر
+              </Button>
               
               <Button 
                 variant="outlined" 
@@ -591,7 +711,7 @@ export default function SubsidiaryLedger({ projectId }: Props) {
                 {table.accountName} ({table.accountCode})
               </Typography>
               
-              <TableContainer component={Paper}>
+              <TableContainer component={Paper} sx={{ width: '7cm' }}>
                 <Table>
                   <TableHead>
                     <TableRow sx={{ backgroundColor: '#757575' }}>
