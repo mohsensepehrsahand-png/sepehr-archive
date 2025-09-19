@@ -31,6 +31,14 @@ export async function GET(request: NextRequest) {
               }
             }
           }
+        },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true
+          }
         }
       },
       orderBy: { sortOrder: 'asc' }
@@ -52,6 +60,7 @@ export async function POST(request: NextRequest) {
       name, 
       description, 
       code,
+      userId,
       isDefault = false, 
       isProtected = false 
     } = body;
@@ -64,6 +73,18 @@ export async function POST(request: NextRequest) {
 
     if (!/^\d{2}$/.test(code) || parseInt(code, 10) < 1 || parseInt(code, 10) > 99) {
       return NextResponse.json({ error: 'کد تفصیلی باید 2 رقم بین 01 تا 99 باشد' }, { status: 400 });
+    }
+
+    // Validate userId if provided
+    if (userId && userId.trim() !== '') {
+      const userExists = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true }
+      });
+      
+      if (!userExists) {
+        return NextResponse.json({ error: 'کاربر انتخاب شده یافت نشد' }, { status: 400 });
+      }
     }
 
     // Check if the provided code already exists (only active details)
@@ -93,6 +114,7 @@ export async function POST(request: NextRequest) {
         code: code,
         name,
         description,
+        userId: userId && userId.trim() !== '' ? userId : null,
         isDefault,
         isProtected,
         sortOrder: (lastSortOrder?.sortOrder || 0) + 1
@@ -105,6 +127,14 @@ export async function POST(request: NextRequest) {
                 group: true
               }
             }
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true
           }
         }
       }
@@ -127,7 +157,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, code } = body;
+    const { name, description, code, userId } = body;
 
     if (!name) {
       return NextResponse.json({ 
@@ -145,9 +175,22 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Detail not found' }, { status: 404 });
     }
 
+    // Validate userId if provided
+    if (userId && userId.trim() !== '') {
+      const userExists = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true }
+      });
+      
+      if (!userExists) {
+        return NextResponse.json({ error: 'کاربر انتخاب شده یافت نشد' }, { status: 400 });
+      }
+    }
+
     const dataToUpdate: any = {
       name,
-      description: description ?? null
+      description: description ?? null,
+      userId: userId && userId.trim() !== '' ? userId : null
     };
 
     if (typeof code === 'string') {
@@ -184,6 +227,14 @@ export async function PUT(request: NextRequest) {
               }
             }
           }
+        },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true
+          }
         }
       }
     });
@@ -191,7 +242,15 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(updatedDetail);
   } catch (error) {
     console.error('Error updating account detail:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      body: { name, description, code, userId }
+    });
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 

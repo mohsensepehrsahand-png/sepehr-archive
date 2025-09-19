@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
+    const stageId = searchParams.get('stageId'); // اضافه کردن فیلتر مرحله
 
     if (!projectId) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
@@ -21,6 +22,11 @@ export async function GET(request: NextRequest) {
     // Add status filter if provided
     if (status) {
       whereClause.status = status;
+    }
+
+    // Add stage filter if provided
+    if (stageId) {
+      whereClause.stageId = stageId;
     }
 
     // Add date range filter if provided (on documentDate)
@@ -37,7 +43,8 @@ export async function GET(request: NextRequest) {
     const documents = await prisma.accountingDocument.findMany({
       where: whereClause,
       include: {
-        entries: true
+        entries: true,
+        stage: true // اضافه کردن اطلاعات مرحله
       },
       orderBy: {
         documentDate: 'desc'
@@ -54,7 +61,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, documentNumber, documentDate, description, entries, status = 'TEMPORARY' } = body;
+    const { projectId, documentNumber, documentDate, description, entries, status = 'TEMPORARY', stageId } = body;
     
     if (!projectId || !documentNumber || !documentDate || !entries || entries.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -78,6 +85,7 @@ export async function POST(request: NextRequest) {
         totalDebit,
         totalCredit,
         status,
+        stageId: stageId || null, // اضافه کردن stageId
         entries: {
           create: entries.map((entry: any) => ({
             accountCode: entry.accountCode,
@@ -90,7 +98,8 @@ export async function POST(request: NextRequest) {
         }
       },
       include: {
-        entries: true
+        entries: true,
+        stage: true // اضافه کردن اطلاعات مرحله
       }
     });
 

@@ -38,6 +38,7 @@ import {
   Checkbox
 } from '@mui/material';
 import { TreeView, TreeItem } from '@mui/lab';
+import ImportCodingModal from './ImportCodingModal';
 import {
   Add,
   Edit,
@@ -56,7 +57,9 @@ import {
   DragIndicator,
   MoreVert,
   Check,
-  Close
+  Close,
+  FileDownload,
+  Upload
 } from '@mui/icons-material';
 
 interface Account {
@@ -329,9 +332,10 @@ const DEFAULT_CODING_STRUCTURE = [
 
 interface AdvancedChartOfAccountsProps {
   projectId: string;
+  fiscalYearId?: string;
 }
 
-export default function AdvancedChartOfAccounts({ projectId }: AdvancedChartOfAccountsProps) {
+export default function AdvancedChartOfAccounts({ projectId, fiscalYearId }: AdvancedChartOfAccountsProps) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -372,12 +376,13 @@ export default function AdvancedChartOfAccounts({ projectId }: AdvancedChartOfAc
     accountName: '',
     balance: 0
   });
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     fetchAccounts();
     fetchBanks();
-  }, [projectId]);
+  }, [projectId, fiscalYearId]);
 
   // تنظیم showCustomType بر اساس formData.type
   useEffect(() => {
@@ -396,7 +401,11 @@ export default function AdvancedChartOfAccounts({ projectId }: AdvancedChartOfAc
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/accounting/accounts?projectId=${projectId}`);
+      const url = fiscalYearId 
+        ? `/api/accounting/accounts?projectId=${projectId}&fiscalYearId=${fiscalYearId}`
+        : `/api/accounting/accounts?projectId=${projectId}`;
+      
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('خطا در دریافت حساب‌ها');
       }
@@ -422,6 +431,11 @@ export default function AdvancedChartOfAccounts({ projectId }: AdvancedChartOfAc
       console.error('Error fetching banks:', error);
       setError('خطا در دریافت حساب‌های بانکی');
     }
+  };
+
+  const handleImportSuccess = () => {
+    fetchAccounts(); // Refresh accounts after import
+    setImportModalOpen(false);
   };
 
   const initializeDefaultCoding = async () => {
@@ -1240,6 +1254,14 @@ export default function AdvancedChartOfAccounts({ projectId }: AdvancedChartOfAc
                   >
                     ایجاد کدینگ پیش‌فرض
                   </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<Upload />}
+                    onClick={() => setImportModalOpen(true)}
+                    color="info"
+                  >
+                    ایمپورت از پروژه دیگر
+                  </Button>
                   {accounts.length > 0 && (
                     <Button
                       variant="outlined"
@@ -1893,6 +1915,15 @@ export default function AdvancedChartOfAccounts({ projectId }: AdvancedChartOfAc
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Import Coding Modal */}
+      <ImportCodingModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        targetProjectId={projectId}
+        targetFiscalYearId={fiscalYearId || ''}
+        onImportSuccess={handleImportSuccess}
+      />
     </Box>
   );
 }

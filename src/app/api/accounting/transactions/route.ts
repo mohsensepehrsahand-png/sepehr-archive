@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
     const { 
       projectId, 
       accountId, 
+      detailedAccountId,
       date, 
       amount, 
       type, 
@@ -137,10 +138,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate detailed account requirement for subsidiary accounts
+    const subsidiaryAccountTypes = ['CUSTOMER', 'CONTRACTOR', 'SUPPLIER'];
+    if (subsidiaryAccountTypes.includes(account.type) && !detailedAccountId) {
+      return NextResponse.json(
+        { error: 'برای حساب معین انتخاب شده، انتخاب حساب تفصیلی الزامی است' },
+        { status: 400 }
+      );
+    }
+
+    // If detailed account is provided, validate it exists and is of the same type
+    if (detailedAccountId) {
+      const detailedAccount = await prisma.account.findUnique({
+        where: { id: detailedAccountId }
+      });
+
+      if (!detailedAccount) {
+        return NextResponse.json(
+          { error: 'حساب تفصیلی یافت نشد' },
+          { status: 404 }
+        );
+      }
+
+      if (detailedAccount.type !== account.type) {
+        return NextResponse.json(
+          { error: 'حساب تفصیلی انتخاب شده باید از همان نوع حساب معین باشد' },
+          { status: 400 }
+        );
+      }
+    }
+
     const transaction = await prisma.transaction.create({
       data: {
         projectId,
         accountId,
+        detailedAccountId: detailedAccountId || null,
         date: new Date(date),
         amount: parseFloat(amount),
         type,

@@ -556,10 +556,17 @@ export async function POST(request: NextRequest) {
 
     console.log('ProjectId:', projectId);
 
-    // Check if default coding already exists for this project
+    // Check if default coding already exists for this project and fiscal year
     console.log('Checking for existing groups...');
+    const whereClause: any = { projectId, isDefault: true };
+    if (body.fiscalYearId) {
+      whereClause.fiscalYearId = body.fiscalYearId;
+    } else {
+      whereClause.fiscalYearId = null;
+    }
+    
     const existingGroups = await prisma.accountGroup.findMany({
-      where: { projectId, isDefault: true }
+      where: whereClause
     });
     console.log('Existing groups found:', existingGroups.length);
 
@@ -578,10 +585,12 @@ export async function POST(request: NextRequest) {
         const group = await tx.accountGroup.create({
           data: {
             projectId,
+            fiscalYearId: body.fiscalYearId || null,
             code: groupData.code,
             name: groupData.name,
             isDefault: groupData.isDefault,
             isProtected: groupData.isProtected,
+            isActive: true,
             sortOrder: groupData.sortOrder
           }
         });
@@ -593,12 +602,14 @@ export async function POST(request: NextRequest) {
           const accountClass = await tx.accountClass.create({
             data: {
               projectId,
+              fiscalYearId: body.fiscalYearId || null,
               groupId: group.id,
               code: classData.code,
               name: classData.name,
               nature: classData.nature,
               isDefault: classData.isDefault,
               isProtected: classData.isProtected,
+              isActive: true,
               sortOrder: classData.sortOrder
             }
           });
@@ -610,12 +621,14 @@ export async function POST(request: NextRequest) {
             const subClass = await tx.accountSubClass.create({
               data: {
                 projectId,
+                fiscalYearId: body.fiscalYearId || null,
                 classId: accountClass.id,
                 code: subClassData.code,
                 name: subClassData.name,
                 hasDetails: subClassData.hasDetails,
                 isDefault: subClassData.isDefault,
                 isProtected: subClassData.isProtected,
+                isActive: true,
                 sortOrder: subClassData.sortOrder
               }
             });
@@ -627,11 +640,13 @@ export async function POST(request: NextRequest) {
               const detail = await tx.accountDetail.create({
                 data: {
                   projectId,
+                  fiscalYearId: body.fiscalYearId || null,
                   subClassId: subClass.id,
                   code: detailData.code,
                   name: detailData.name,
                   isDefault: detailData.isDefault,
                   isProtected: detailData.isProtected,
+                  isActive: true,
                   sortOrder: detailData.sortOrder
                 }
               });

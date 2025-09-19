@@ -14,7 +14,15 @@ export async function GET(
       where: { id },
       include: {
         units: true,
-        userInstallments: true
+        userInstallments: true,
+        customRole: {
+          select: {
+            id: true,
+            name: true,
+            label: true,
+            color: true
+          }
+        }
       }
     });
 
@@ -35,6 +43,8 @@ export async function GET(
         lastName: user.lastName,
         email: user.email,
         role: user.role,
+        customRoleId: user.customRoleId,
+        customRole: user.customRole,
         isActive: user.isActive,
         createdAt: user.createdAt
       },
@@ -62,7 +72,7 @@ export async function PUT(
   try {
     const { id } = params;
     const body = await request.json();
-    const { isActive, newPassword } = body;
+    const { isActive, newPassword, role, customRoleId, username, firstName, lastName, email } = body;
 
     // بررسی وجود کاربر
     const existingUser = await prisma.user.findUnique({
@@ -89,6 +99,36 @@ export async function PUT(
       updateData.passwordHash = passwordHash;
     }
 
+    // تغییر نقش
+    if (role) {
+      updateData.role = role;
+    }
+
+    // تغییر نقش سفارشی
+    if (customRoleId !== undefined) {
+      updateData.customRoleId = customRoleId || null;
+    }
+
+    // تغییر نام کاربری
+    if (username !== undefined) {
+      updateData.username = username;
+    }
+
+    // تغییر نام
+    if (firstName !== undefined) {
+      updateData.firstName = firstName;
+    }
+
+    // تغییر نام خانوادگی
+    if (lastName !== undefined) {
+      updateData.lastName = lastName;
+    }
+
+    // تغییر ایمیل
+    if (email !== undefined) {
+      updateData.email = email;
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'هیچ تغییری برای اعمال وجود ندارد' },
@@ -106,6 +146,15 @@ export async function PUT(
         firstName: true,
         lastName: true,
         role: true,
+        customRoleId: true,
+        customRole: {
+          select: {
+            id: true,
+            name: true,
+            label: true,
+            color: true
+          }
+        },
         email: true,
         isActive: true,
         createdAt: true

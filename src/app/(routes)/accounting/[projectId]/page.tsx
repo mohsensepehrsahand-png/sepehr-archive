@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Box,
   Typography,
@@ -12,27 +12,29 @@ import {
   CircularProgress,
   Alert,
   IconButton,
-  Tooltip
+  Tooltip,
+  Grid,
+  Button,
+  Chip
 } from '@mui/material';
 import {
   AccountBalance,
-  Receipt,
-  People,
   Print,
   Download,
   Refresh,
-  AccountBalanceWallet,
   Assessment,
   AccountTree,
   Description,
   PlayArrow,
-  Stop
+  Stop,
+  Payment,
+  People,
+  CalendarMonth,
+  ArrowForward
 } from '@mui/icons-material';
-import Daybook from '@/components/accounting/Daybook';
-import GeneralLedger from '@/components/accounting/GeneralLedger';
-import SubsidiaryLedger from '@/components/accounting/SubsidiaryLedger';
-import DetailLedger from '@/components/accounting/DetailLedger';
-import BankIntegration from '@/components/accounting/BankIntegration';
+import AccountingBooksTab from '@/components/accounting/AccountingBooksTab';
+import InstallmentDefinitionsManager from '@/components/finance/InstallmentDefinitionsManager';
+import ProjectUsersManager from '@/components/finance/ProjectUsersManager';
 import HierarchicalCodingDefinition from '@/components/accounting/HierarchicalCodingDefinition';
 import ReportsTab from '@/components/accounting/ReportsTab';
 import DocumentsTab from '@/components/accounting/DocumentsTab';
@@ -63,32 +65,51 @@ function TabPanel(props: TabPanelProps) {
 
 export default function ProjectAccountingPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.projectId as string;
   const [tabValue, setTabValue] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [projectName, setProjectName] = useState('');
+  const [installmentTabValue, setInstallmentTabValue] = useState(0);
+  const [fiscalYears, setFiscalYears] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch project name
-    const fetchProjectName = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}`);
-        if (response.ok) {
-          const project = await response.json();
+        setLoading(true);
+        
+        // Fetch project name
+        const projectResponse = await fetch(`/api/projects/${projectId}`);
+        if (projectResponse.ok) {
+          const project = await projectResponse.json();
           setProjectName(project.name);
         }
+
+        // Fetch fiscal years
+        const fiscalYearsResponse = await fetch(`/api/projects/${projectId}/fiscal-years`);
+        if (fiscalYearsResponse.ok) {
+          const fiscalYearsData = await fiscalYearsResponse.json();
+          setFiscalYears(fiscalYearsData);
+        }
       } catch (error) {
-        console.error('Error fetching project name:', error);
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     if (projectId) {
-      fetchProjectName();
+      fetchData();
     }
   }, [projectId]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const handleInstallmentTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setInstallmentTabValue(newValue);
   };
 
   const handleRefresh = () => {
@@ -110,6 +131,14 @@ export default function ProjectAccountingPage() {
         <Alert severity="error">
           شناسه پروژه مورد نیاز است
         </Alert>
+      </Box>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
       </Box>
     );
   }
@@ -136,24 +165,9 @@ export default function ProjectAccountingPage() {
       component: <ClosingEntryTab key={refreshKey} projectId={projectId} />
     },
     {
-      label: 'دفتر روزنامه',
-      icon: <Receipt />,
-      component: <Daybook key={refreshKey} projectId={projectId} />
-    },
-    {
-      label: 'دفتر کل',
+      label: 'دفاتر حسابداری',
       icon: <AccountBalance />,
-      component: <GeneralLedger key={refreshKey} projectId={projectId} />
-    },
-    {
-      label: 'دفتر معین',
-      icon: <People />,
-      component: <SubsidiaryLedger key={refreshKey} projectId={projectId} />
-    },
-    {
-      label: 'دفتر تفصیلی',
-      icon: <AccountBalance />,
-      component: <DetailLedger key={refreshKey} projectId={projectId} />
+      component: <AccountingBooksTab key={refreshKey} projectId={projectId} refreshKey={refreshKey} />
     },
     {
       label: 'گزارش‌ها',
@@ -161,11 +175,47 @@ export default function ProjectAccountingPage() {
       component: <ReportsTab key={refreshKey} projectId={projectId} />
     },
     {
-      label: 'یکپارچه‌سازی بانکی',
-      icon: <AccountBalanceWallet />,
-      component: <BankIntegration key={refreshKey} projectId={projectId} />
+      label: 'مدیریت اقساط',
+      icon: <Payment />,
+      component: (
+        <Box>
+          <Paper sx={{ mb: 2 }}>
+            <Tabs
+              value={installmentTabValue}
+              onChange={handleInstallmentTabChange}
+              sx={{
+                '& .MuiTab-root': {
+                  fontFamily: 'Vazirmatn, Arial, sans-serif',
+                  fontWeight: 'bold'
+                }
+              }}
+            >
+              <Tab label="مدیریت انواع قسط" />
+              <Tab label="مدیریت کاربران پروژه" />
+            </Tabs>
+          </Paper>
+          
+          {installmentTabValue === 0 && (
+            <InstallmentDefinitionsManager
+              projectId={projectId}
+              onDefinitionsChange={() => setRefreshKey(prev => prev + 1)}
+            />
+          )}
+          
+          {installmentTabValue === 1 && (
+            <ProjectUsersManager
+              projectId={projectId}
+              onUsersChange={() => setRefreshKey(prev => prev + 1)}
+            />
+          )}
+        </Box>
+      )
     }
   ];
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('fa-IR');
+  };
 
   return (
     <Box>
@@ -185,59 +235,75 @@ export default function ProjectAccountingPage() {
                   <Refresh />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="چاپ">
-                <IconButton onClick={handlePrint}>
-                  <Print />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="خروجی">
-                <IconButton onClick={handleExport}>
-                  <Download />
-                </IconButton>
-              </Tooltip>
             </Box>
           </Box>
 
+          <Typography variant="h6" gutterBottom sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CalendarMonth />
+            انتخاب سال مالی
+          </Typography>
 
-          <Paper sx={{ width: '100%' }}>
-            <Tabs
-              value={tabValue}
-              onChange={handleTabChange}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{
-                borderBottom: 1,
-                borderColor: 'divider',
-                '& .MuiTab-root': {
-                  minHeight: 64,
-                  fontSize: '0.9rem',
-                  fontWeight: 600
-                }
-              }}
-            >
-              {tabs.map((tab, index) => (
-                <Tab
-                  key={index}
-                  icon={tab.icon}
-                  label={tab.label}
-                  iconPosition="start"
-                  sx={{
-                    flexDirection: 'row',
-                    gap: 1,
-                    '& .MuiSvgIcon-root': {
-                      fontSize: '1.1rem'
-                    }
-                  }}
-                />
+          {fiscalYears.length === 0 ? (
+            <Alert severity="info">
+              هیچ سال مالی برای این پروژه تعریف نشده است. لطفاً ابتدا سال مالی تعریف کنید.
+            </Alert>
+          ) : (
+            <Grid container spacing={2}>
+              {fiscalYears.map((fiscalYear) => (
+                <Grid item xs={12} sm={6} md={4} key={fiscalYear.id}>
+                  <Card 
+                    sx={{ 
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: 4
+                      }
+                    }}
+                    onClick={() => router.push(`/accounting/${projectId}/${fiscalYear.id}`)}
+                  >
+                    <CardContent>
+                      <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                        <Typography variant="h6" component="h3">
+                          سال مالی {fiscalYear.year}
+                        </Typography>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          endIcon={<ArrowForward />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/accounting/${projectId}/${fiscalYear.id}`);
+                          }}
+                        >
+                          ورود
+                        </Button>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" mb={1}>
+                        {formatDate(fiscalYear.startDate)} - {formatDate(fiscalYear.endDate)}
+                      </Typography>
+                      <Box display="flex" gap={1}>
+                        {fiscalYear.isActive && (
+                          <Chip 
+                            label="فعال" 
+                            color="success" 
+                            size="small" 
+                          />
+                        )}
+                        {fiscalYear.isClosed && (
+                          <Chip 
+                            label="بسته" 
+                            color="default" 
+                            size="small" 
+                          />
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
               ))}
-            </Tabs>
-
-            {tabs.map((tab, index) => (
-              <TabPanel key={index} value={tabValue} index={index}>
-                {tab.component}
-              </TabPanel>
-            ))}
-          </Paper>
+            </Grid>
+          )}
         </CardContent>
       </Card>
     </Box>

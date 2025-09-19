@@ -5,16 +5,24 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
+    const fiscalYearId = searchParams.get('fiscalYearId');
 
     if (!projectId) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
     }
 
+    const whereClause: any = { 
+      projectId,
+      isActive: true 
+    };
+
+    // Add fiscal year filter if provided
+    if (fiscalYearId) {
+      whereClause.fiscalYearId = fiscalYearId;
+    }
+
     const groups = await prisma.accountGroup.findMany({
-      where: { 
-        projectId,
-        isActive: true 
-      },
+      where: whereClause,
       include: {
         classes: {
           include: {
@@ -22,7 +30,17 @@ export async function GET(request: NextRequest) {
               include: {
                 details: {
                   where: { isActive: true },
-                  orderBy: { sortOrder: 'asc' }
+                  orderBy: { sortOrder: 'asc' },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        username: true
+                      }
+                    }
+                  }
                 }
               },
               where: { isActive: true },
@@ -46,7 +64,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, code, name, isDefault = false, isProtected = true } = body;
+    const { projectId, fiscalYearId, code, name, isDefault = false, isProtected = true } = body;
 
     console.log('POST /api/accounting/coding/groups - Request data:', {
       projectId,
@@ -70,17 +88,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Get next sort order (needed for both new and reactivated groups)
+    const lastGroupWhere: any = { projectId };
+    if (fiscalYearId) lastGroupWhere.fiscalYearId = fiscalYearId;
+    
     const lastGroup = await prisma.accountGroup.findFirst({
-      where: { projectId },
+      where: lastGroupWhere,
       orderBy: { sortOrder: 'desc' }
     });
 
     // Check if code already exists for this project (including inactive groups)
+    const existingGroupWhere: any = { 
+      projectId, 
+      code
+    };
+    if (fiscalYearId) existingGroupWhere.fiscalYearId = fiscalYearId;
+    
     const existingGroup = await prisma.accountGroup.findFirst({
-      where: { 
-        projectId, 
-        code
-      }
+      where: existingGroupWhere
     });
 
     if (existingGroup) {
@@ -105,6 +129,7 @@ export async function POST(request: NextRequest) {
     const newGroup = await prisma.accountGroup.create({
       data: {
         projectId,
+        fiscalYearId,
         code,
         name,
         isDefault,

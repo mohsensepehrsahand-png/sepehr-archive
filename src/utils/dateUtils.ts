@@ -86,3 +86,22 @@ export const formatRelativeTime = (dateString: string | Date): string => {
   // For older dates, show Persian date
   return formatPersianDateShort(date);
 };
+
+// Convert Persian year to Gregorian dates
+export const getPersianYearStartDate = (persianYear: number): string => {
+  // Persian year starts on March 21st (approximately)
+  // We need to calculate the exact Gregorian date for Farvardin 1st of the given Persian year
+  const gregorianYear = persianYear + 621; // Approximate conversion
+  
+  // For simplicity, we'll use March 21st as the start of Persian year
+  // In a more accurate implementation, you might want to use a proper Persian calendar library
+  const startDate = new Date(gregorianYear, 2, 21); // Month is 0-indexed, so 2 = March
+  return startDate.toISOString().split('T')[0];
+};
+
+export const getPersianYearEndDate = (persianYear: number): string => {
+  // Persian year ends on March 20th of the next Gregorian year
+  const gregorianYear = persianYear + 622; // Next year
+  const endDate = new Date(gregorianYear, 2, 20); // March 20th
+  return endDate.toISOString().split('T')[0];
+};

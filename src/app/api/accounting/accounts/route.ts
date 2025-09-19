@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
     const type = searchParams.get('type');
+    const fiscalYearId = searchParams.get('fiscalYearId');
 
     // Get user role from cookies
     const userRole = request.cookies.get('userRole')?.value;
@@ -32,6 +33,9 @@ export async function GET(request: NextRequest) {
     const where: any = { projectId };
     if (type) {
       where.type = type;
+    }
+    if (fiscalYearId) {
+      where.fiscalYearId = fiscalYearId;
     }
 
     const accounts = await prisma.account.findMany({

@@ -7,6 +7,8 @@ import {
 } from '@mui/material';
 import BalanceSheetModal from './BalanceSheetModal';
 import TrialBalanceModal from './TrialBalanceModal';
+import StageReportsModal from './StageReportsModal';
+import DetailedReportsModal from './DetailedReportsModal';
 
 interface ReportsTabProps {
   projectId: string;
@@ -15,11 +17,13 @@ interface ReportsTabProps {
 export default function ReportsTab({ projectId }: ReportsTabProps) {
   const [showBalanceSheet, setShowBalanceSheet] = useState(false);
   const [showTrialBalance, setShowTrialBalance] = useState(false);
+  const [showStageReports, setShowStageReports] = useState(false);
+  const [showDetailedReports, setShowDetailedReports] = useState(false);
 
   return (
     <Box>
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <Grid container spacing={3} justifyContent="center" maxWidth="600px">
+        <Grid container spacing={3} justifyContent="center" maxWidth="800px">
           <Grid item>
             <Button
               variant="contained"
@@ -48,6 +52,34 @@ export default function ReportsTab({ projectId }: ReportsTabProps) {
               تراز آزمایشی
             </Button>
           </Grid>
+          <Grid item>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={() => setShowStageReports(true)}
+              sx={{
+                fontFamily: 'Vazirmatn, Arial, sans-serif',
+                fontSize: '1.2rem',
+                padding: '12px 24px'
+              }}
+            >
+              گزارش مراحل
+            </Button>
+          </Grid>
+          <Grid item>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={() => setShowDetailedReports(true)}
+              sx={{
+                fontFamily: 'Vazirmatn, Arial, sans-serif',
+                fontSize: '1.2rem',
+                padding: '12px 24px'
+              }}
+            >
+              گزارش‌های تفصیلی
+            </Button>
+          </Grid>
         </Grid>
       </Box>
 
@@ -60,6 +92,18 @@ export default function ReportsTab({ projectId }: ReportsTabProps) {
       <TrialBalanceModal
         open={showTrialBalance}
         onClose={() => setShowTrialBalance(false)}
+        projectId={projectId}
+      />
+
+      <StageReportsModal
+        open={showStageReports}
+        onClose={() => setShowStageReports(false)}
+        projectId={projectId}
+      />
+
+      <DetailedReportsModal
+        open={showDetailedReports}
+        onClose={() => setShowDetailedReports(false)}
         projectId={projectId}
       />
     </Box>

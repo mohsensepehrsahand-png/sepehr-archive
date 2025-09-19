@@ -65,6 +65,7 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import CustomRoleManager from "@/components/admin/CustomRoleManager";
 
 const roleLabels = {
   ADMIN: "مدیر سیستم",
@@ -75,7 +76,7 @@ const roleLabels = {
 
 const roleColors = {
   ADMIN: "error",
-  BUYER: "primary",
+  BUYER: "primary", 
   CONTRACTOR: "success",
   SUPPLIER: "warning"
 };
@@ -107,15 +108,26 @@ export default function UsersPage() {
     lastName: "",
     email: "",
     role: "BUYER",
+    customRoleId: null as string | null,
     password: "",
     phone: "",
     department: ""
   });
+  const [customRoles, setCustomRoles] = useState<any[]>([]);
+  const [openCustomRoleManager, setOpenCustomRoleManager] = useState(false);
 
   // دریافت کاربران از دیتابیس
   useEffect(() => {
     fetchUsers();
+    fetchCustomRoles();
   }, []);
+
+  // Refresh custom roles when forms open
+  useEffect(() => {
+    if (openNewUser || openEditUser) {
+      fetchCustomRoles();
+    }
+  }, [openNewUser, openEditUser]);
 
   const fetchUsers = async () => {
     try {
@@ -123,7 +135,18 @@ export default function UsersPage() {
       const response = await fetch('/api/users');
       if (response.ok) {
         const data = await response.json();
-        setUsers(data);
+        // Ensure each user has proper customRole data
+        const usersWithCustomRoles = data.map((user: any) => {
+          if (user.customRoleId && user.role === "CUSTOM") {
+            const customRole = customRoles.find(r => r.id === user.customRoleId);
+            return {
+              ...user,
+              customRole: customRole || null
+            };
+          }
+          return user;
+        });
+        setUsers(usersWithCustomRoles);
       } else {
         console.error('Failed to fetch users');
         showSnackbar('خطا در دریافت کاربران', 'error');
@@ -136,6 +159,18 @@ export default function UsersPage() {
     }
   };
 
+  const fetchCustomRoles = async () => {
+    try {
+      const response = await fetch('/api/custom-roles');
+      if (response.ok) {
+        const data = await response.json();
+        setCustomRoles(data);
+      }
+    } catch (error) {
+      console.error('Error fetching custom roles:', error);
+    }
+  };
+
   // Filter users
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
@@ -144,7 +179,10 @@ export default function UsersPage() {
       user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesRole = roleFilter === "همه" || user.role === roleFilter;
+    const matchesRole = roleFilter === "همه" || 
+      user.role === roleFilter || 
+      (user.customRole && user.customRole.name === roleFilter) ||
+      (user.customRole && user.customRole.id === roleFilter);
     const matchesStatus = statusFilter === "همه" || 
       (statusFilter === "فعال" && user.isActive) ||
       (statusFilter === "غیرفعال" && !user.isActive);
@@ -202,14 +240,15 @@ export default function UsersPage() {
             firstName: newUser.firstName,
             lastName: newUser.lastName,
             email: newUser.email,
-            role: newUser.role
+            role: newUser.role === "CUSTOM" ? "BUYER" : newUser.role, // Use BUYER as default for custom roles
+            customRoleId: newUser.role === "CUSTOM" ? newUser.customRoleId : null
           }),
         });
 
         if (response.ok) {
           const createdUser = await response.json();
           setUsers([createdUser, ...users]);
-          setNewUser({ username: "", firstName: "", lastName: "", email: "", role: "BUYER", password: "", phone: "", department: "" });
+          setNewUser({ username: "", firstName: "", lastName: "", email: "", role: "BUYER", customRoleId: null, password: "", phone: "", department: "" });
           setOpenNewUser(false);
           showSnackbar("کاربر جدید با موفقیت ایجاد شد", "success");
           // بروزرسانی خودکار لیست کاربران
@@ -225,12 +264,45 @@ export default function UsersPage() {
     }
   };
 
-  const handleEditUser = () => {
+  const handleEditUser = async () => {
     if (selectedUser) {
-      setUsers(users.map(u => u.id === selectedUser.id ? { ...u, ...selectedUser } : u));
-      setOpenEditUser(false);
-      setSelectedUser(null);
-      showSnackbar("اطلاعات کاربر با موفقیت بروزرسانی شد", "success");
+      try {
+        const response = await fetch(`/api/users/${selectedUser.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: selectedUser.username,
+            firstName: selectedUser.firstName,
+            lastName: selectedUser.lastName,
+            email: selectedUser.email,
+            role: selectedUser.role === "CUSTOM" ? "BUYER" : selectedUser.role, // Use BUYER as default for custom roles
+            customRoleId: selectedUser.role === "CUSTOM" ? selectedUser.customRoleId : null
+          }),
+        });
+
+        if (response.ok) {
+          const responseData = await response.json();
+          const updatedUser = responseData.user;
+          
+          // Update the users list immediately
+          setUsers(prevUsers => 
+            prevUsers.map(u => u.id === selectedUser.id ? updatedUser : u)
+          );
+          
+          showSnackbar("اطلاعات کاربر با موفقیت بروزرسانی شد", "success");
+          
+          setOpenEditUser(false);
+          setSelectedUser(null);
+        } else {
+          const error = await response.json();
+          showSnackbar(error.error || "خطا در بروزرسانی کاربر", "error");
+        }
+      } catch (error) {
+        console.error('Error updating user:', error);
+        showSnackbar("خطا در بروزرسانی کاربر", "error");
+      }
     }
   };
 
@@ -378,6 +450,80 @@ export default function UsersPage() {
 
   const showSnackbar = (message: string, severity: "success" | "error" | "info" | "warning") => {
     setSnackbar({ open: true, message, severity });
+  };
+
+  // Helper function to get role display info
+  const getRoleDisplayInfo = (user: any) => {
+    // Check if user has a custom role
+    if (user.customRoleId && user.role === "CUSTOM") {
+      const customRole = customRoles.find(r => r.id === user.customRoleId);
+      if (customRole) {
+        return {
+          label: customRole.label,
+          color: customRole.color,
+          name: customRole.name
+        };
+      }
+    }
+    
+    // Check if user.customRole exists (for backward compatibility)
+    if (user.customRole) {
+      return {
+        label: user.customRole.label,
+        color: user.customRole.color,
+        name: user.customRole.name
+      };
+    }
+    
+    return {
+      label: roleLabels[user.role as keyof typeof roleLabels] || user.role,
+      color: roleColors[user.role as keyof typeof roleColors] || "primary",
+      name: user.role
+    };
+  };
+
+  // Helper function to get selected role display for dropdowns
+  const getSelectedRoleDisplay = (user: any) => {
+    if (user.customRoleId && user.role === "CUSTOM") {
+      const customRole = customRoles.find(r => r.id === user.customRoleId);
+      return customRole ? customRole.id : user.role;
+    }
+    return user.role;
+  };
+
+  // Helper function to ensure user object has all necessary properties
+  const ensureUserWithCustomRole = (user: any) => {
+    let customRole = user.customRole || null;
+    
+    // If user has customRoleId but no customRole, find it from customRoles array
+    if (user.customRoleId && !customRole) {
+      customRole = customRoles.find(r => r.id === user.customRoleId) || null;
+    }
+    
+    return {
+      ...user,
+      customRoleId: user.customRoleId || null,
+      customRole: customRole
+    };
+  };
+
+  // Handle custom role selection
+  const handleCustomRoleSelect = (role: any) => {
+    if (role) {
+      if (selectedUser) {
+        setSelectedUser({ ...selectedUser, customRoleId: role.id, role: "CUSTOM" });
+      } else {
+        setNewUser({ ...newUser, customRoleId: role.id, role: "CUSTOM" });
+      }
+    } else {
+      if (selectedUser) {
+        setSelectedUser({ ...selectedUser, customRoleId: null, role: "BUYER" });
+      } else {
+        setNewUser({ ...newUser, customRoleId: null, role: "BUYER" });
+      }
+    }
+    // Close the custom role manager after selection
+    setOpenCustomRoleManager(false);
   };
 
   const getRoleIcon = (role: string) => {
@@ -566,6 +712,11 @@ export default function UsersPage() {
             <MenuItem value="BUYER">خریدار</MenuItem>
             <MenuItem value="CONTRACTOR">پیمانکار</MenuItem>
             <MenuItem value="SUPPLIER">تامین‌کننده</MenuItem>
+            {customRoles.map((role) => (
+              <MenuItem key={role.id} value={role.name}>
+                {role.label}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
 
@@ -804,9 +955,13 @@ export default function UsersPage() {
                     
                     <TableCell>
                       <Chip 
-                        label={roleLabels[user.role as keyof typeof roleLabels]} 
-                        color={roleColors[user.role as keyof typeof roleColors] as any}
+                        label={getRoleDisplayInfo(user).label} 
+                        color={getRoleDisplayInfo(user).color.startsWith('#') ? undefined : getRoleDisplayInfo(user).color}
                         size="small"
+                        sx={{
+                          backgroundColor: getRoleDisplayInfo(user).color.startsWith('#') ? getRoleDisplayInfo(user).color : undefined,
+                          color: getRoleDisplayInfo(user).color.startsWith('#') ? 'white' : undefined,
+                        }}
                       />
                     </TableCell>
                     
@@ -845,7 +1000,7 @@ export default function UsersPage() {
                           size="small" 
                           color="info"
                           onClick={() => {
-                            setSelectedUser(user);
+                            setSelectedUser(ensureUserWithCustomRole(user));
                             setOpenUserDetails(true);
                           }}
                         >
@@ -855,7 +1010,7 @@ export default function UsersPage() {
                           size="small" 
                           color="primary"
                           onClick={() => {
-                            setSelectedUser(user);
+                            setSelectedUser(ensureUserWithCustomRole(user));
                             setOpenEditUser(true);
                           }}
                         >
@@ -917,7 +1072,7 @@ export default function UsersPage() {
         </MenuItem>
         <MenuItem onClick={() => {
           if (actionUser) {
-            setSelectedUser(actionUser);
+            setSelectedUser(ensureUserWithCustomRole(actionUser));
             setOpenUserDetails(true);
           }
           setAnchorEl(null);
@@ -929,7 +1084,7 @@ export default function UsersPage() {
         </MenuItem>
         <MenuItem onClick={() => {
           if (actionUser) {
-            setSelectedUser(actionUser);
+            setSelectedUser(ensureUserWithCustomRole(actionUser));
             setOpenEditUser(true);
           }
           setAnchorEl(null);
@@ -1012,13 +1167,38 @@ export default function UsersPage() {
             <FormControl fullWidth sx={{ gridColumn: { xs: '1 / -1', sm: '1 / -1' } }}>
               <InputLabel>نقش</InputLabel>
               <Select
-                value={newUser.role}
+                value={getSelectedRoleDisplay(newUser)}
                 label="نقش"
-                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                onChange={(e) => {
+                  if (e.target.value === "CUSTOM") {
+                    setOpenCustomRoleManager(true);
+                  } else if (customRoles.find(r => r.id === e.target.value)) {
+                    setNewUser({ ...newUser, role: "CUSTOM", customRoleId: e.target.value });
+                  } else {
+                    setNewUser({ ...newUser, role: e.target.value, customRoleId: null });
+                  }
+                }}
               >
                 <MenuItem value="BUYER">خریدار</MenuItem>
                 <MenuItem value="CONTRACTOR">پیمانکار</MenuItem>
                 <MenuItem value="SUPPLIER">تامین‌کننده</MenuItem>
+                {customRoles.map((role) => (
+                  <MenuItem key={role.id} value={role.id}>
+                    {role.label}
+                  </MenuItem>
+                ))}
+                <MenuItem 
+                  value="CUSTOM"
+                  sx={{ 
+                    color: 'primary.main',
+                    fontWeight: 'bold',
+                    borderTop: '1px solid #e0e0e0',
+                    marginTop: '4px',
+                    paddingTop: '8px'
+                  }}
+                >
+                  افزودن نقش +
+                </MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -1076,14 +1256,39 @@ export default function UsersPage() {
               <FormControl fullWidth sx={{ gridColumn: { xs: '1 / -1', sm: '1 / -1' } }}>
                 <InputLabel>نقش</InputLabel>
                 <Select
-                  value={selectedUser.role}
+                  value={getSelectedRoleDisplay(selectedUser)}
                   label="نقش"
-                  onChange={(e) => setSelectedUser({ ...selectedUser, role: e.target.value })}
+                  onChange={(e) => {
+                    if (e.target.value === "CUSTOM") {
+                      setOpenCustomRoleManager(true);
+                    } else if (customRoles.find(r => r.id === e.target.value)) {
+                      setSelectedUser({ ...selectedUser, role: "CUSTOM", customRoleId: e.target.value });
+                    } else {
+                      setSelectedUser({ ...selectedUser, role: e.target.value, customRoleId: null });
+                    }
+                  }}
                 >
                   <MenuItem value="ADMIN">مدیر</MenuItem>
                   <MenuItem value="BUYER">خریدار</MenuItem>
                   <MenuItem value="CONTRACTOR">پیمانکار</MenuItem>
                   <MenuItem value="SUPPLIER">تامین‌کننده</MenuItem>
+                  {customRoles.map((role) => (
+                    <MenuItem key={role.id} value={role.id}>
+                      {role.label}
+                    </MenuItem>
+                  ))}
+                  <MenuItem 
+                    value="CUSTOM"
+                    sx={{ 
+                      color: 'primary.main',
+                      fontWeight: 'bold',
+                      borderTop: '1px solid #e0e0e0',
+                      marginTop: '4px',
+                      paddingTop: '8px'
+                    }}
+                  >
+                    افزودن نقش +
+                  </MenuItem>
                 </Select>
               </FormControl>
             </Box>
@@ -1123,9 +1328,13 @@ export default function UsersPage() {
                     @{selectedUser.username}
                   </Typography>
                   <Chip 
-                    label={roleLabels[selectedUser.role as keyof typeof roleLabels]} 
-                    color={roleColors[selectedUser.role as keyof typeof roleColors] as any}
-                    sx={{ mt: 1 }}
+                    label={getRoleDisplayInfo(selectedUser).label} 
+                    color={getRoleDisplayInfo(selectedUser).color.startsWith('#') ? undefined : getRoleDisplayInfo(selectedUser).color}
+                    sx={{ 
+                      mt: 1,
+                      backgroundColor: getRoleDisplayInfo(selectedUser).color.startsWith('#') ? getRoleDisplayInfo(selectedUser).color : undefined,
+                      color: getRoleDisplayInfo(selectedUser).color.startsWith('#') ? 'white' : undefined,
+                    }}
                   />
                 </Box>
               </Box>
@@ -1189,6 +1398,18 @@ export default function UsersPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Custom Role Manager */}
+      <CustomRoleManager
+        open={openCustomRoleManager}
+        onClose={() => setOpenCustomRoleManager(false)}
+        onRoleSelect={handleCustomRoleSelect}
+        selectedRoleId={newUser.customRoleId || selectedUser?.customRoleId}
+        onRoleCreated={() => {
+          // Refresh custom roles list when roles are created, updated, or deleted
+          fetchCustomRoles();
+        }}
+      />
 
       {/* Snackbar */}
       <Snackbar

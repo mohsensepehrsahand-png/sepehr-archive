@@ -39,8 +39,10 @@ import {
   ImportExport,
   Lock,
   LockOpen,
-  DragIndicator
+  DragIndicator,
+  Upload
 } from '@mui/icons-material';
+import ImportCodingModal from './ImportCodingModal';
 
 interface Project {
   id: string;
@@ -85,6 +87,13 @@ interface AccountDetail {
   code: string;
   name: string;
   description?: string;
+  userId?: string;
+  user?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    username: string;
+  };
   isDefault: boolean;
   isProtected: boolean;
   sortOrder: number;
@@ -92,6 +101,7 @@ interface AccountDetail {
 
 interface HierarchicalCodingDefinitionProps {
   projectId: string;
+  fiscalYearId?: string;
 }
 
 // Simple Code Input Component
@@ -137,9 +147,10 @@ const SimpleCodeInput = ({
   );
 };
 
-export default function HierarchicalCodingDefinition({ projectId }: HierarchicalCodingDefinitionProps) {
+export default function HierarchicalCodingDefinition({ projectId, fiscalYearId }: HierarchicalCodingDefinitionProps) {
   const [project, setProject] = useState<Project | null>(null);
   const [groups, setGroups] = useState<AccountGroup[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
@@ -170,12 +181,14 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
   const [newDetailCode, setNewDetailCode] = useState('');
   const [newDetailName, setNewDetailName] = useState('');
   const [newDetailDescription, setNewDetailDescription] = useState('');
+  const [newDetailUserId, setNewDetailUserId] = useState('');
 
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addDialogLevel, setAddDialogLevel] = useState<'group' | 'class' | 'subclass' | 'detail'>('group');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editDialogLevel, setEditDialogLevel] = useState<'group' | 'class' | 'subclass' | 'detail'>('group');
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   
   // Context menu states
@@ -244,10 +257,17 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
     setToastOpen(true);
   };
 
+  const handleImportSuccess = () => {
+    fetchCodingData(); // Refresh data after import
+    setImportModalOpen(false);
+    showToast('کدینگ با موفقیت ایمپورت شد', 'success');
+  };
+
   useEffect(() => {
     fetchProject();
     fetchCodingData();
-  }, [projectId]);
+    fetchUsers();
+  }, [projectId, fiscalYearId]);
 
   const fetchProject = async () => {
     try {
@@ -265,7 +285,10 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
     try {
       setLoadingData(true);
       setError('');
-      const response = await fetch(`/api/accounting/coding/groups?projectId=${projectId}`);
+      const url = fiscalYearId 
+        ? `/api/accounting/coding/groups?projectId=${projectId}&fiscalYearId=${fiscalYearId}`
+        : `/api/accounting/coding/groups?projectId=${projectId}`;
+      const response = await fetch(url);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'خطا در دریافت کدینگ' }));
         throw new Error(errorData.error || 'خطا در دریافت کدینگ');
@@ -285,6 +308,18 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       setGroups([]);
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('خطا در دریافت کاربران');
+      const data = await response.json();
+      setUsers(data);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setError('خطا در دریافت اطلاعات کاربران');
     }
   };
 
@@ -330,6 +365,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             projectId,
+            fiscalYearId,
             code: newGroupCode.trim(),
             name: newGroupName.trim()
           })
@@ -369,6 +405,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
         
         const requestData = {
           projectId,
+          fiscalYearId,
           groupId: selectedGroup,
           name: newClassName.trim(),
           nature: newClassNature,
@@ -402,6 +439,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             projectId,
+            fiscalYearId,
             classId: selectedClass,
             name: newSubClassName.trim(),
             hasDetails: newSubClassHasDetails,
@@ -429,10 +467,12 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             projectId,
+            fiscalYearId,
             subClassId: selectedSubClass,
             name: newDetailName.trim(),
             description: newDetailDescription.trim() || undefined,
-            code: newDetailCode  // Send only the detail part, not the full code
+            code: newDetailCode,  // Send only the detail part, not the full code
+            userId: newDetailUserId && newDetailUserId.trim() !== '' ? newDetailUserId : null
           })
         });
       }
@@ -453,6 +493,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       setNewDetailName('');
       setNewDetailCode('');
       setNewDetailDescription('');
+      setNewDetailUserId('');
       setAddDialogOpen(false);
       showToast('آیتم جدید با موفقیت اضافه شد', 'success');
       fetchCodingData();
@@ -475,6 +516,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
     setNewDetailName('');
     setNewDetailCode('');
     setNewDetailDescription('');
+    setNewDetailUserId('');
     
     // Generate suggested codes
     if (level === 'group') {
@@ -534,7 +576,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
 
   const getAllDetails = () => {
     if (!showAllGroups) return [];
-    return groups.flatMap(group => 
+    const allDetails = groups.flatMap(group => 
       group.classes.flatMap(accountClass => 
         accountClass.subClasses.flatMap(subClass => 
           subClass.details.map(detail => ({
@@ -549,6 +591,8 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
         )
       )
     );
+    
+    return allDetails;
   };
 
   // Helper function to get full code for display
@@ -640,6 +684,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       setNewDetailName(item.name);
       setNewDetailDescription(item.description || '');
       setNewDetailCode(item.code);
+      setNewDetailUserId(item.userId || '');
     }
     
     setEditDialogOpen(true);
@@ -728,7 +773,8 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
         body = {
           name: newDetailName.trim(),
           description: newDetailDescription.trim() || undefined,
-          code: newDetailCode  // Send only the detail part, not the full code
+          code: newDetailCode,  // Send only the detail part, not the full code
+          userId: newDetailUserId && newDetailUserId.trim() !== '' ? newDetailUserId : null
         };
       }
 
@@ -752,6 +798,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       setNewSubClassName('');
       setNewDetailName('');
       setNewDetailDescription('');
+      setNewDetailUserId('');
       showToast('آیتم با موفقیت ویرایش شد', 'success');
       fetchCodingData();
     } catch (error) {
@@ -763,7 +810,10 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
   const handleDeleteAllCoding = async () => {
     try {
       setDeleting(true);
-      const res = await fetch(`/api/accounting/coding/groups?projectId=${projectId}`, { method: 'DELETE' });
+      const deleteUrl = fiscalYearId 
+        ? `/api/accounting/coding/groups?projectId=${projectId}&fiscalYearId=${fiscalYearId}`
+        : `/api/accounting/coding/groups?projectId=${projectId}`;
+      const res = await fetch(deleteUrl, { method: 'DELETE' });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
         throw new Error(e.error || 'خطا در حذف کدینگ');
@@ -783,7 +833,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
       const response = await fetch('/api/accounting/coding/import-default', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId })
+        body: JSON.stringify({ projectId, fiscalYearId })
       });
 
       if (!response.ok) {
@@ -850,6 +900,7 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
+          fiscalYearId,
           groups: updatedGroups.map(g => ({
             id: g.id,
             sortOrder: g.sortOrder,
@@ -940,6 +991,15 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
             sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
           >
             ایمپورت کدینگ پیش فرض
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Upload />}
+            onClick={() => setImportModalOpen(true)}
+            color="info"
+            sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+          >
+            ایمپورت از پروژه دیگر
           </Button>
           <Button
             variant="outlined"
@@ -1550,13 +1610,21 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
                             color="warning" 
                             sx={{ fontSize: '0.7rem', height: 20 }} 
                           />
-                          <Box>
+                          <Box sx={{ flex: 1 }}>
                             <Typography sx={{ 
                               fontFamily: 'Vazirmatn, Arial, sans-serif',
                               fontWeight: selectedDetail === detail.id ? 'bold' : 'normal',
                               fontSize: '0.8rem'
                             }}>
                               {detail.name}
+                              {detail.user && (
+                                <span style={{ color: '#666', fontSize: '0.7rem' }}>
+                                  {' '}({detail.user.firstName && detail.user.lastName 
+                                    ? `${detail.user.firstName} ${detail.user.lastName}`
+                                    : detail.user.username
+                                  })
+                                </span>
+                              )}
                             </Typography>
                             <Typography sx={{ 
                               fontFamily: 'Vazirmatn, Arial, sans-serif',
@@ -1610,27 +1678,27 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
                 ) : (
                   <Box>
                     {getSelectedSubClass()?.details.map((detail) => (
-                      <Box
-                        key={detail.id}
-                        onClick={() => setSelectedDetail(detail.id)}
-                        onContextMenu={(e) => handleContextMenu(e, 'detail', detail)}
-                        sx={{
-                          p: 1,
-                          mb: 0.5,
-                          border: selectedDetail === detail.id ? '2px solid' : '1px solid',
-                          borderColor: selectedDetail === detail.id ? 'warning.main' : 'divider',
-                          borderRadius: 1,
-                          cursor: 'pointer',
-                          bgcolor: selectedDetail === detail.id ? 'warning.light' : 'transparent',
-                          '&:hover': {
-                            bgcolor: selectedDetail === detail.id ? 'warning.light' : 'action.hover'
-                          },
-                          transition: 'all 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
-                        }}
-                      >
+                        <Box
+                          key={detail.id}
+                          onClick={() => setSelectedDetail(detail.id)}
+                          onContextMenu={(e) => handleContextMenu(e, 'detail', detail)}
+                          sx={{
+                            p: 1,
+                            mb: 0.5,
+                            border: selectedDetail === detail.id ? '2px solid' : '1px solid',
+                            borderColor: selectedDetail === detail.id ? 'warning.main' : 'divider',
+                            borderRadius: 1,
+                            cursor: 'pointer',
+                            bgcolor: selectedDetail === detail.id ? 'warning.light' : 'transparent',
+                            '&:hover': {
+                              bgcolor: selectedDetail === detail.id ? 'warning.light' : 'action.hover'
+                            },
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}
+                        >
                         <Box display="flex" alignItems="center" gap={0.5}>
                           <Chip 
                             label={getFullCode(detail, 'detail')} 
@@ -1638,13 +1706,23 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
                             color="warning" 
                             sx={{ fontSize: '0.7rem', height: 20 }} 
                           />
-                          <Typography sx={{ 
-                            fontFamily: 'Vazirmatn, Arial, sans-serif',
-                            fontWeight: selectedDetail === detail.id ? 'bold' : 'normal',
-                            fontSize: '0.8rem'
-                          }}>
-                            {detail.name}
-                          </Typography>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography sx={{ 
+                              fontFamily: 'Vazirmatn, Arial, sans-serif',
+                              fontWeight: selectedDetail === detail.id ? 'bold' : 'normal',
+                              fontSize: '0.8rem'
+                            }}>
+                              {detail.name}
+                              {detail.user && (
+                                <span style={{ color: '#666', fontSize: '0.7rem' }}>
+                                  {' '}({detail.user.firstName && detail.user.lastName 
+                                    ? `${detail.user.firstName} ${detail.user.lastName}`
+                                    : detail.user.username
+                                  })
+                                </span>
+                              )}
+                            </Typography>
+                          </Box>
                         </Box>
                         <IconButton
                           size="small"
@@ -1794,6 +1872,26 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
                   rows={3}
                   sx={{ mb: 2 }}
                 />
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>کاربر مرتبط (اختیاری)</InputLabel>
+                  <Select
+                    value={newDetailUserId}
+                    onChange={(e) => setNewDetailUserId(e.target.value)}
+                    label="کاربر مرتبط (اختیاری)"
+                  >
+                    <MenuItem value="">
+                      <em>هیچ کاربری انتخاب نشده</em>
+                    </MenuItem>
+                    {users.map((user) => (
+                      <MenuItem key={user.id} value={user.id}>
+                        {user.firstName && user.lastName 
+                          ? `${user.firstName} ${user.lastName} (${user.username})`
+                          : user.username
+                        }
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
                 <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
                   کد کامل: {selectedSubClass ? getFullCode(getSelectedSubClass(), 'subclass') + newDetailCode : newDetailCode}
                 </Typography>
@@ -2000,6 +2098,26 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
                   rows={3}
                   sx={{ mb: 2 }}
                 />
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel>کاربر مرتبط (اختیاری)</InputLabel>
+                  <Select
+                    value={newDetailUserId}
+                    onChange={(e) => setNewDetailUserId(e.target.value)}
+                    label="کاربر مرتبط (اختیاری)"
+                  >
+                    <MenuItem value="">
+                      <em>هیچ کاربری انتخاب نشده</em>
+                    </MenuItem>
+                    {users.map((user) => (
+                      <MenuItem key={user.id} value={user.id}>
+                        {user.firstName && user.lastName 
+                          ? `${user.firstName} ${user.lastName} (${user.username})`
+                          : user.username
+                        }
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
                 <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
                   کد کامل: {selectedSubClass ? getFullCode(getSelectedSubClass(), 'subclass') + newDetailCode : newDetailCode}
                 </Typography>
@@ -2070,6 +2188,14 @@ export default function HierarchicalCodingDefinition({ projectId }: Hierarchical
         </Alert>
       </Snackbar>
 
+      {/* Import Coding Modal */}
+      <ImportCodingModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        targetProjectId={projectId}
+        targetFiscalYearId={fiscalYearId || ''}
+        onImportSuccess={handleImportSuccess}
+      />
     </Box>
   );
 }

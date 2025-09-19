@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import DatePicker from "react-multi-date-picker";
 import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
@@ -68,25 +68,62 @@ export default function PersianDatePicker({
   disabled = false,
   fullWidth = true
 }: PersianDatePickerProps) {
+  const [internalValue, setInternalValue] = useState<DateObject | null>(null);
+  const [isUserInteracting, setIsUserInteracting] = useState(false);
+  const lastValidValue = useRef<string>('');
   
+  // Update internal value when external value changes
+  useEffect(() => {
+    if (!isUserInteracting) {
+      if (!value || value.trim() === '') {
+        setInternalValue(null);
+        lastValidValue.current = '';
+      } else {
+        try {
+          const date = new Date(value);
+          if (!isNaN(date.getTime())) {
+            const persianDate = new DateObject({ date, calendar: persian, locale: persian_fa });
+            setInternalValue(persianDate);
+            lastValidValue.current = value;
+          }
+        } catch {
+          setInternalValue(null);
+          lastValidValue.current = '';
+        }
+      }
+    }
+  }, [value, isUserInteracting]);
+
   const handleDateChange = (date: DateObject | DateObject[] | null) => {
-    if (date && !Array.isArray(date)) {
-      // Convert Persian date to ISO string for storage
-      const isoDate = date.toDate().toISOString().split('T')[0];
-      onChange(isoDate);
-    } else if (date === null) {
+    if (date === null || date === undefined) {
+      setInternalValue(null);
+      setIsUserInteracting(false);
       onChange('');
+      return;
+    }
+    
+    if (Array.isArray(date)) {
+      return;
+    }
+    
+    try {
+      setIsUserInteracting(true);
+      setInternalValue(date);
+      
+      // Convert to ISO string
+      const isoDate = date.toDate().toISOString().split('T')[0];
+      
+      if (isoDate !== 'Invalid Date') {
+        lastValidValue.current = isoDate;
+        onChange(isoDate);
+      }
+    } catch (error) {
+      // Silent error handling
     }
   };
 
-  const getDisplayValue = () => {
-    if (!value) return '';
-    try {
-      const date = new Date(value);
-      return new DateObject({ date, calendar: persian, locale: persian_fa });
-    } catch {
-      return '';
-    }
+  const handleCalendarClose = () => {
+    setIsUserInteracting(false);
   };
 
   return (
@@ -95,12 +132,18 @@ export default function PersianDatePicker({
       <FormControl fullWidth={fullWidth} error={error}>
         <Box sx={{ position: 'relative' }}>
           <DatePicker
-          value={getDisplayValue()}
+          value={internalValue}
           onChange={handleDateChange}
+          onCalendarClose={handleCalendarClose}
           calendar={persian}
           locale={persian_fa}
           calendarPosition="bottom-right"
           disabled={disabled}
+          onlyShowInPopover={true}
+          hideOnSelect={true}
+          autoSelect={false}
+          format="YYYY/MM/DD"
+          editable={false}
           style={{
             fontFamily: 'Vazirmatn, Arial, sans-serif',
             width: '100%',

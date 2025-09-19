@@ -23,7 +23,10 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  FormControl,
+  InputLabel,
+  Select
 } from '@mui/material';
 import PersianDatePicker from '../common/PersianDatePicker';
 import Autocomplete from '@mui/material/Autocomplete';
@@ -58,6 +61,8 @@ interface Document {
   totalDebit: number;
   totalCredit: number;
   status: 'TEMPORARY' | 'PERMANENT';
+  stageId?: string; // اضافه کردن stageId
+  stage?: { id: string; title: string }; // اضافه کردن stage
 }
 
 interface DocumentModalProps {
@@ -80,7 +85,8 @@ export default function DocumentModal({
   const [formData, setFormData] = useState({
     documentNumber: '',
     documentDate: '',
-    description: ''
+    description: '',
+    stageId: '' // اضافه کردن فیلد مرحله
   });
   const [entries, setEntries] = useState<DocumentEntry[]>([]);
   const [accountSelectorOpen, setAccountSelectorOpen] = useState(false);
@@ -98,6 +104,7 @@ export default function DocumentModal({
   const [accountsFlat, setAccountsFlat] = useState<any[]>([]);
   const [codingFlat, setCodingFlat] = useState<Array<{ fullCode: string; name: string; nature?: 'DEBIT' | 'CREDIT' | 'DEBIT_CREDIT' }>>([]);
   const [commonDescriptionsOpen, setCommonDescriptionsOpen] = useState(false);
+  const [stages, setStages] = useState<Array<{id: string, title: string}>>([]);
 
   const codeOptions = useMemo(() => {
     return (codingFlat || []).map(o => ({
@@ -170,15 +177,27 @@ export default function DocumentModal({
     }
   };
 
+  // دریافت مراحل پروژه (InstallmentDefinitions)
+  const fetchStages = async () => {
+    try {
+      const response = await fetch(`/api/finance/projects/${projectId}/installment-definitions`);
+      if (response.ok) {
+        const data = await response.json();
+        setStages(data);
+      }
+    } catch (error) {
+      console.error('Error fetching stages:', error);
+    }
+  };
+
   useEffect(() => {
     if (open) {
-      if (document && isEditMode) {
-        // Check if document is permanent and prevent editing
-        if (document.status === 'PERMANENT') {
-          setError('اسناد دائم قابل ویرایش نیستند');
-          return;
-        }
-        
+      fetchNextDocumentNumber();
+      fetchAccounts();
+      fetchCodingFlat();
+      fetchStages(); // دریافت مراحل پروژه
+      
+      if (document) {
         // Format date for input field (YYYY-MM-DD)
         const formattedDate = document.documentDate.includes('T') 
           ? document.documentDate.split('T')[0]
@@ -187,15 +206,17 @@ export default function DocumentModal({
         setFormData({
           documentNumber: document.documentNumber,
           documentDate: formattedDate,
-          description: document.description
+          description: document.description || '',
+          stageId: document.stageId || '' // اضافه کردن stageId
         });
         setEntries(document.entries);
       } else {
-        fetchNextDocumentNumber();
+        // Reset form for new document
         setFormData({
           documentNumber: '',
           documentDate: new Date().toISOString().split('T')[0],
-          description: ''
+          description: '',
+          stageId: ''
         });
         // Add 2 empty rows by default
         const defaultEntries: DocumentEntry[] = [
@@ -219,10 +240,8 @@ export default function DocumentModal({
         setEntries(defaultEntries);
       }
       setError('');
-      fetchAccounts();
-      fetchCodingFlat();
     }
-  }, [open, document, isEditMode, projectId]);
+  }, [open, document, projectId]);
 
   const fetchNextDocumentNumber = async () => {
     try {
@@ -596,6 +615,7 @@ export default function DocumentModal({
       documentNumber: formData.documentNumber,
       documentDate: formData.documentDate,
       description: formData.description || '',
+      stageId: formData.stageId || undefined, // اضافه کردن stageId
       entries: cleanEntries,
       totalDebit: validTotalDebit,
       totalCredit: validTotalCredit,
@@ -674,7 +694,7 @@ export default function DocumentModal({
                   fullWidth
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}>
+              <Grid size={{ xs: 12, sm: 3 }}>
                 <Box display="flex" alignItems="center" gap={1}>
                   <TextField
                     fullWidth
@@ -708,6 +728,29 @@ export default function DocumentModal({
                     <Send fontSize="small" />
                   </IconButton>
                 </Box>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 3 }}>
+                <FormControl fullWidth size="small" disabled={isPermanentDocument}>
+                  <InputLabel sx={{ fontSize: '0.75rem' }}>مرحله پروژه</InputLabel>
+                  <Select
+                    value={formData.stageId}
+                    onChange={(e) => handleInputChange('stageId', e.target.value)}
+                    label="مرحله پروژه"
+                    sx={{ 
+                      '& .MuiSelect-select': { textAlign: 'right', fontSize: '0.75rem' },
+                      '& .MuiInputLabel-root': { fontSize: '0.75rem' }
+                    }}
+                  >
+                    <MenuItem value="">
+                      <em>بدون مرحله</em>
+                    </MenuItem>
+                    {stages.map((stage) => (
+                      <MenuItem key={stage.id} value={stage.id}>
+                        {stage.title}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
             </Grid>
           </Box>

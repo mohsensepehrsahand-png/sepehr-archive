@@ -17,6 +17,15 @@ export async function GET() {
         firstName: true,
         lastName: true,
         role: true,
+        customRoleId: true,
+        customRole: {
+          select: {
+            id: true,
+            name: true,
+            label: true,
+            color: true
+          }
+        },
         isActive: true,
         email: true,
         createdAt: true,
@@ -44,7 +53,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('Received user data:', { ...body, password: '[HIDDEN]' });
     
-    const { username, password, firstName, lastName, email, role } = body;
+    const { username, password, firstName, lastName, email, role, customRoleId } = body;
 
     // بررسی فیلدهای الزامی
     if (!username || !password) {
@@ -98,7 +107,8 @@ export async function POST(request: NextRequest) {
         firstName,
         lastName,
         email: email && email.trim() ? email.trim() : null,
-        role
+        role,
+        customRoleId: customRoleId || null
       },
       select: {
         id: true,
@@ -106,6 +116,15 @@ export async function POST(request: NextRequest) {
         firstName: true,
         lastName: true,
         role: true,
+        customRoleId: true,
+        customRole: {
+          select: {
+            id: true,
+            name: true,
+            label: true,
+            color: true
+          }
+        },
         email: true,
         isActive: true,
         createdAt: true

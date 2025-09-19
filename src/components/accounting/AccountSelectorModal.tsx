@@ -65,6 +65,12 @@ interface AccountDetail {
   code: string;
   name: string;
   description?: string;
+  user?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    username: string;
+  };
 }
 
 interface AccountSelectorModalProps {
@@ -251,7 +257,15 @@ export default function AccountSelectorModal({
     }
 
     if (detail) {
-      onSelect(getFullCode(detail, 'detail'), detail.name, accountNature);
+      // Format name with user information in parentheses like in coding tab
+      let displayName = detail.name;
+      if (detail.user) {
+        const userName = detail.user.firstName && detail.user.lastName 
+          ? `${detail.user.firstName} ${detail.user.lastName}`
+          : detail.user.username;
+        displayName = `${detail.name} (${userName})`;
+      }
+      onSelect(getFullCode(detail, 'detail'), displayName, accountNature);
     } else if (subClass) {
       onSelect(getFullCode(subClass, 'subclass'), subClass.name, accountNature);
     } else if (accountClass) {
@@ -913,6 +927,14 @@ export default function AccountSelectorModal({
                                 fontSize: '0.8rem'
                               }}>
                                 {detail.name}
+                                {detail.user && (
+                                  <span style={{ color: '#666', fontSize: '0.7rem' }}>
+                                    {' '}({detail.user.firstName && detail.user.lastName 
+                                      ? `${detail.user.firstName} ${detail.user.lastName}`
+                                      : detail.user.username
+                                    })
+                                  </span>
+                                )}
                               </Typography>
                             </Box>
                             <IconButton

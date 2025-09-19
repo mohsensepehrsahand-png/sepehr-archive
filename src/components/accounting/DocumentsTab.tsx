@@ -25,7 +25,13 @@ import {
   Tabs,
   Tab,
   Badge,
-  Snackbar
+  Snackbar,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Switch,
+  Grid
 } from '@mui/material';
 import {
   Add,
@@ -40,7 +46,6 @@ import {
   Schedule,
   FilterList
 } from '@mui/icons-material';
-import { Switch } from '@mui/material';
 import DocumentModal from './DocumentModal';
 import AccountSelectorModal from './AccountSelectorModal';
 import { useTableFilters, TableFilters } from '@/components/common';
@@ -55,6 +60,8 @@ interface Document {
   totalDebit: number;
   totalCredit: number;
   status: 'TEMPORARY' | 'PERMANENT';
+  stageId?: string;
+  stage?: { id: string; title: string };
 }
 
 interface DocumentEntry {
@@ -94,6 +101,10 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
   
   // Date filter modal state
   const [dateFilterModalOpen, setDateFilterModalOpen] = useState(false);
+
+  // Stage filter state
+  const [stages, setStages] = useState<Array<{id: string, title: string}>>([]);
+  const [selectedStage, setSelectedStage] = useState<string>('');
 
   // Use the new filter hook
   const {
@@ -192,7 +203,21 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
 
   useEffect(() => {
     fetchDocuments();
+    fetchStages();
   }, [projectId]);
+
+  // دریافت مراحل پروژه
+  const fetchStages = async () => {
+    try {
+      const response = await fetch(`/api/finance/projects/${projectId}/installment-definitions`);
+      if (response.ok) {
+        const data = await response.json();
+        setStages(data);
+      }
+    } catch (error) {
+      console.error('Error fetching stages:', error);
+    }
+  };
 
   // Apply sub-tab filtering to the already filtered data
   const finalFilteredDocuments = useMemo(() => {
@@ -203,11 +228,31 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/accounting/documents?projectId=${projectId}`);
+      console.log('Fetching documents for projectId:', projectId);
+      
+      if (!projectId) {
+        setError('Project ID is required');
+        return;
+      }
+      
+      const params = new URLSearchParams({ projectId });
+      
+      // اضافه کردن فیلتر مرحله
+      if (selectedStage) {
+        params.append('stageId', selectedStage);
+      }
+      
+      const url = `/api/accounting/documents?${params}`;
+      console.log('Fetching from URL:', url);
+      
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
+        console.log('Documents fetched successfully:', data);
         setDocuments(data);
       } else {
+        const errorText = await response.text();
+        console.error('Error response:', response.status, errorText);
         setError('خطا در دریافت اسناد');
       }
     } catch (error) {
@@ -217,6 +262,11 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
       setLoading(false);
     }
   };
+
+  // تغییر fetchDocuments هنگام تغییر فیلتر مرحله
+  useEffect(() => {
+    fetchDocuments();
+  }, [selectedStage]);
 
   const handleAddDocument = () => {
     setSelectedDocument(null);
@@ -467,23 +517,47 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
         </Paper>
       </Box>
 
-      {/* Search Input */}
-      <Box mb={3}>
-        <TextField
-          fullWidth
-          placeholder="جستجو در اسناد (شماره سند، توضیحات، تاریخ، مبالغ)..."
-          value={filters.searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
-        />
-      </Box>
+      {/* Search Input and Stage Filter */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={8}>
+          <TextField
+            fullWidth
+            placeholder="جستجو در اسناد (شماره سند، توضیحات، تاریخ، مبالغ)..."
+            value={filters.searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <FormControl fullWidth>
+            <InputLabel sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+              فیلتر بر اساس مرحله
+            </InputLabel>
+            <Select
+              value={selectedStage}
+              onChange={(e) => setSelectedStage(e.target.value)}
+              label="فیلتر بر اساس مرحله"
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            >
+              <MenuItem value="">
+                <em>همه مراحل</em>
+              </MenuItem>
+              {stages.map((stage) => (
+                <MenuItem key={stage.id} value={stage.id}>
+                  {stage.title}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+      </Grid>
 
       <TableContainer component={Paper}>
         <Table size="small">
@@ -537,6 +611,9 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
                   توضیحات سند
                 </TableSortLabel>
               </TableCell>
+              <TableCell sx={{ textAlign: 'center', fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                مرحله
+              </TableCell>
               <TableCell sx={{ textAlign: 'center' }}>
                 <TableSortLabel
                   active={sortField === 'totalDebit'}
@@ -577,6 +654,9 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
                 <TableCell sx={{ textAlign: 'center' }}>{document.documentNumber}</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>{formatDate(document.documentDate)}</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>{document.description}</TableCell>
+                <TableCell sx={{ textAlign: 'center', fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                  {document.stage?.title || '-'}
+                </TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>
                   <Chip 
                     label={document.totalDebit.toLocaleString('fa-IR')} 

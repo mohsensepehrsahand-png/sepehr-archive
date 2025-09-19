@@ -45,69 +45,58 @@ export default function ProjectAccountingCard({ project }: ProjectAccountingCard
 
   return (
     <Card 
-      elevation={isHovered ? 6 : 3}
+      elevation={isHovered ? 4 : 2}
       sx={{ 
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'all 0.3s ease-in-out',
+        transition: 'all 0.2s ease-in-out',
         cursor: 'pointer',
         '&:hover': {
-          transform: 'translateY(-4px)',
+          transform: 'translateY(-2px)',
         }
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-        <Box display="flex" alignItems="center" gap={1} mb={2}>
-          <AccountBalance color="primary" />
-          <Typography 
-            variant="h6" 
-            component="h3" 
-            sx={{ 
-              fontWeight: 'bold',
+      <CardContent sx={{ flexGrow: 1, p: 2, pb: 1 }}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <AccountBalance color="primary" fontSize="small" />
+            <Typography 
+              variant="subtitle1" 
+              component="h3" 
+              sx={{ 
+                fontWeight: 'bold',
+                fontFamily: 'Vazirmatn, Arial, sans-serif',
+                fontSize: '0.95rem'
+              }}
+            >
+              {project.name}
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            endIcon={<ArrowForward />}
+            onClick={handleNavigateToAccounting}
+            sx={{
               fontFamily: 'Vazirmatn, Arial, sans-serif',
-              flexGrow: 1
+              fontWeight: 'bold',
+              py: 0.5,
+              px: 1.5,
+              fontSize: '0.75rem',
+              minWidth: 'auto'
             }}
           >
-            {project.name}
-          </Typography>
+            ورود
+          </Button>
         </Box>
 
-        <Box display="flex" alignItems="center" gap={1} mb={2}>
-          <CalendarToday fontSize="small" color="action" />
-          <Typography variant="body2" color="text.secondary">
-            تاریخ ایجاد: {formatDate(project.createdAt)}
-          </Typography>
-        </Box>
-
-        <Divider sx={{ my: 2 }} />
-
-        <Box mb={2}>
-          <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
-            مدیریت سال مالی
-          </Typography>
+        <Box mb={1}>
           <ProjectFiscalYearManager project={project} />
         </Box>
       </CardContent>
-
-      <CardActions sx={{ p: 2, pt: 0 }}>
-        <Button
-          variant="contained"
-          endIcon={<ArrowForward />}
-          onClick={handleNavigateToAccounting}
-          fullWidth
-          sx={{
-            fontFamily: 'Vazirmatn, Arial, sans-serif',
-            fontWeight: 'bold',
-            py: 1.5,
-            borderRadius: 2
-          }}
-        >
-          ورود به حسابداری پروژه
-        </Button>
-      </CardActions>
     </Card>
   );
 }

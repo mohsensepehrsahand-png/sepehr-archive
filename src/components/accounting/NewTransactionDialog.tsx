@@ -25,6 +25,9 @@ interface Account {
   id: string;
   name: string;
   type: string;
+  level: number;
+  parentId?: string;
+  children?: Account[];
 }
 
 interface Document {
@@ -42,31 +45,48 @@ interface NewTransactionDialogProps {
 
 const transactionSchema = z.object({
   accountId: z.string().min(1, 'انتخاب حساب الزامی است'),
+  detailedAccountId: z.string().optional(),
   date: z.string().min(1, 'تاریخ الزامی است'),
   amount: z.string().min(1, 'مبلغ الزامی است').refine((val) => !isNaN(Number(val)) && Number(val) > 0, 'مبلغ باید عدد مثبت باشد'),
   type: z.enum(['DEBIT', 'CREDIT'], { required_error: 'نوع تراکنش الزامی است' }),
   journalType: z.enum(['DAYBOOK', 'GENERAL_LEDGER', 'SUBSIDIARY'], { required_error: 'نوع دفتر الزامی است' }),
   description: z.string().optional(),
   documentId: z.string().optional()
+}).refine((data) => {
+  // If account is a subsidiary account (CUSTOMER, CONTRACTOR, SUPPLIER), detailedAccountId must be provided
+  const selectedAccount = accounts.find(acc => acc.id === data.accountId);
+  const subsidiaryAccountTypes = ['CUSTOMER', 'CONTRACTOR', 'SUPPLIER'];
+  if (selectedAccount && subsidiaryAccountTypes.includes(selectedAccount.type) && !data.detailedAccountId) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'برای حساب معین انتخاب شده، انتخاب حساب تفصیلی الزامی است',
+  path: ['detailedAccountId']
 });
 
 type TransactionFormData = z.infer<typeof transactionSchema>;
 
 export default function NewTransactionDialog({ open, onClose, projectId, onSuccess }: NewTransactionDialogProps) {
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [detailedAccounts, setDetailedAccounts] = useState<Account[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
 
   const {
     control,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting }
   } = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       accountId: '',
+      detailedAccountId: '',
       date: new Date().toISOString().split('T')[0],
       amount: '',
       type: 'DEBIT',
@@ -76,12 +96,30 @@ export default function NewTransactionDialog({ open, onClose, projectId, onSucce
     }
   });
 
+  const watchedAccountId = watch('accountId');
+
   useEffect(() => {
     if (open) {
       fetchAccounts();
       fetchDocuments();
     }
   }, [open, projectId]);
+
+  useEffect(() => {
+    if (watchedAccountId) {
+      const selectedAccount = accounts.find(acc => acc.id === watchedAccountId);
+      const subsidiaryAccountTypes = ['CUSTOMER', 'CONTRACTOR', 'SUPPLIER'];
+      if (selectedAccount && subsidiaryAccountTypes.includes(selectedAccount.type)) {
+        fetchDetailedAccounts(selectedAccount.type);
+      } else {
+        setDetailedAccounts([]);
+        setValue('detailedAccountId', '');
+      }
+    } else {
+      setDetailedAccounts([]);
+      setValue('detailedAccountId', '');
+    }
+  }, [watchedAccountId, accounts, setValue]);
 
   const fetchAccounts = async () => {
     try {
@@ -93,6 +131,21 @@ export default function NewTransactionDialog({ open, onClose, projectId, onSucce
       setAccounts(data);
     } catch (error) {
       console.error('Error fetching accounts:', error);
+    }
+  };
+
+  const fetchDetailedAccounts = async (accountType: string) => {
+    try {
+      // For now, we'll use the same accounts API but filter by type
+      // In a real implementation, you might want to create specific detailed accounts
+      const response = await fetch(`/api/accounting/accounts?projectId=${projectId}&type=${accountType}`);
+      if (!response.ok) {
+        throw new Error('خطا در دریافت حساب‌های تفصیلی');
+      }
+      const data = await response.json();
+      setDetailedAccounts(data);
+    } catch (error) {
+      console.error('Error fetching detailed accounts:', error);
     }
   };
 
@@ -187,6 +240,9 @@ export default function NewTransactionDialog({ open, onClose, projectId, onSucce
                   <Select
                     {...field}
                     label="حساب"
+                    onChange={(e) => {
+                      field.onChange(e);
+                    }}
                   >
                     {accounts.map((account) => (
                       <MenuItem key={account.id} value={account.id}>
@@ -207,6 +263,46 @@ export default function NewTransactionDialog({ open, onClose, projectId, onSucce
                 </FormControl>
               )}
             />
+
+
+
+            {/* Test - Always show for testing */}
+            {watchedAccountId && (
+              <Box>
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  تست: حساب انتخاب شده - {watchedAccountId}
+                </Alert>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  برای حساب معین انتخاب شده، انتخاب حساب تفصیلی الزامی است
+                </Alert>
+                <Controller
+                  name="detailedAccountId"
+                  control={control}
+                  render={({ field }) => (
+                    <FormControl fullWidth error={!!errors.detailedAccountId}>
+                      <InputLabel>حساب تفصیلی *</InputLabel>
+                      <Select
+                        {...field}
+                        label="حساب تفصیلی *"
+                      >
+                        {detailedAccounts.map((account) => (
+                          <MenuItem key={account.id} value={account.id}>
+                            <Typography sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                              {account.name}
+                            </Typography>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      {errors.detailedAccountId && (
+                        <Typography variant="caption" color="error" sx={{ mt: 0.5, fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                          {errors.detailedAccountId.message}
+                        </Typography>
+                      )}
+                    </FormControl>
+                  )}
+                />
+              </Box>
+            )}
 
             {/* Date and Amount */}
             <Box display="flex" gap={2}>
