@@ -16,6 +16,9 @@ export async function PUT(
     const { installmentId } = await params;
     const body = await request.json();
     const { shareAmount, paidAmount, installmentDefinitionId, title, dueDate, paymentDate } = body;
+    
+    console.log('📝 PUT /api/finance/user-installments/' + installmentId);
+    console.log('📦 Request body:', { shareAmount, paidAmount, installmentDefinitionId, title, dueDate, paymentDate });
 
     // Check if installment exists
     const existingInstallment = await prisma.userInstallment.findUnique({
@@ -95,12 +98,16 @@ export async function PUT(
     });
 
     // Handle payment update
+    console.log('Payment update check:', { paidAmount, paymentDate });
+    
     if (paidAmount !== undefined && paymentDate) {
       // Only count payments without receipt (actual installment payments)
       const currentPaidAmount = updatedInstallment.payments.reduce((sum, p) => {
         return sum + (p.amount > 0 && !p.receiptImagePath ? p.amount : 0);
       }, 0);
       const difference = parseFloat(paidAmount) - currentPaidAmount;
+      
+      console.log('Payment calculation:', { currentPaidAmount, paidAmount, difference });
 
       if (difference > 0) {
         // Add payment
@@ -133,17 +140,63 @@ export async function PUT(
             break;
           }
         }
+      } else if (difference === 0) {
+        // Amount didn't change, but maybe payment date changed
+        // Update the latest payment date
+        const latestPayment = updatedInstallment.payments
+          .filter(p => !p.receiptImagePath) // Only update non-receipt payments
+          .sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())[0];
+        
+        if (latestPayment) {
+          console.log('Updating payment date for payment:', latestPayment.id, 'from', latestPayment.paymentDate, 'to', paymentDate);
+          await prisma.payment.update({
+            where: { id: latestPayment.id },
+            data: { paymentDate: new Date(paymentDate) }
+          });
+        } else if (parseFloat(paidAmount) > 0) {
+          // No payment exists but paidAmount > 0, create a new payment
+          console.log('Creating new payment with amount:', paidAmount, 'and date:', paymentDate);
+          await prisma.payment.create({
+            data: {
+              userInstallmentId: installmentId,
+              paymentDate: new Date(paymentDate),
+              amount: parseFloat(paidAmount),
+              description: "ویرایش قسط"
+            }
+          });
+        }
       }
     } else if (paymentDate && paidAmount === undefined) {
       // Only payment date changed, update the latest payment date
-      const latestPayment = updatedInstallment.payments.sort((a, b) => 
-        new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-      )[0];
+      const latestPayment = updatedInstallment.payments
+        .filter(p => !p.receiptImagePath) // Only update non-receipt payments
+        .sort((a, b) => 
+          new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+        )[0];
       
       if (latestPayment) {
+        console.log('Updating payment date for payment:', latestPayment.id, 'from', latestPayment.paymentDate, 'to', paymentDate);
         await prisma.payment.update({
           where: { id: latestPayment.id },
           data: { paymentDate: new Date(paymentDate) }
+        });
+      }
+    } else if (paymentDate && paidAmount !== undefined && parseFloat(paidAmount) > 0) {
+      // Payment date is provided but no current payment exists
+      // Create a new payment
+      const currentPaidAmount = updatedInstallment.payments.reduce((sum, p) => {
+        return sum + (p.amount > 0 && !p.receiptImagePath ? p.amount : 0);
+      }, 0);
+      
+      if (currentPaidAmount === 0) {
+        console.log('Creating new payment with amount:', paidAmount, 'and date:', paymentDate);
+        await prisma.payment.create({
+          data: {
+            userInstallmentId: installmentId,
+            paymentDate: new Date(paymentDate),
+            amount: parseFloat(paidAmount),
+            description: "ویرایش قسط"
+          }
         });
       }
     }

@@ -10,7 +10,13 @@ import {
   Grid,
   Alert,
   CircularProgress,
-  Divider
+  Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import { Save, Calculate } from '@mui/icons-material';
 
@@ -19,6 +25,19 @@ interface PenaltySettings {
   name: string;
   dailyPenaltyAmount: number;
   penaltyGraceDays: number;
+}
+
+interface Installment {
+  id: string;
+  title: string;
+  dueDate: string;
+  shareAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  status: string;
+  order: number;
+  paymentDate?: string;
+  dailyDelay: number;
 }
 
 interface PenaltySettingsManagerProps {
@@ -33,6 +52,7 @@ export default function PenaltySettingsManager({
   onSettingsChange
 }: PenaltySettingsManagerProps) {
   const [settings, setSettings] = useState<PenaltySettings | null>(null);
+  const [installments, setInstallments] = useState<Installment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [calculating, setCalculating] = useState(false);
@@ -67,8 +87,24 @@ export default function PenaltySettingsManager({
     }
   };
 
+  const fetchInstallments = async () => {
+    try {
+      const response = await fetch(`/api/finance/projects/${projectId}/users/${userId}/installments`);
+      if (!response.ok) {
+        throw new Error('خطا در دریافت اقساط');
+      }
+
+      const data = await response.json();
+      console.log('Fetched installments:', data);
+      setInstallments(data);
+    } catch (err) {
+      console.error('Error fetching installments:', err);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
+    fetchInstallments();
   }, [projectId, userId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -180,6 +216,9 @@ export default function PenaltySettingsManager({
       const data = await response.json();
       console.log('Recalculated penalties:', data);
       
+      // Refresh installments to show updated data
+      await fetchInstallments();
+      
       // Call callback to refresh parent component
       onSettingsChange?.();
     } catch (err) {
@@ -187,6 +226,25 @@ export default function PenaltySettingsManager({
       // Don't show error to user as this is automatic
     }
   };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('fa-IR').format(amount) + ' ریال';
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('fa-IR');
+  };
+
+  // Calculate penalties for installments with delay
+  const penaltiesData = installments
+    .filter(inst => inst.dailyDelay > 0)
+    .map(inst => ({
+      order: inst.order,
+      title: inst.title,
+      dailyDelay: inst.dailyDelay || 0,
+      dailyRate: formData.dailyPenaltyAmount,
+      totalPenalty: (inst.dailyDelay || 0) * formData.dailyPenaltyAmount
+    }));
 
   if (loading) {
     return (
@@ -289,6 +347,7 @@ export default function PenaltySettingsManager({
           </Box>
         </Box>
       </Box>
+
     </Paper>
   );
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@/generated/prisma";
+import { getCurrentUser } from "@/app/api/_lib/db";
 
 const prisma = new PrismaClient();
 
@@ -34,9 +35,16 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { amount, receiptDate, description, receiptImagePath } = body;
+    
+    console.log('Receipt update request:', { id, body }); // Debug log
 
     const receipt = await prisma.receipt.update({
       where: { id },
@@ -47,6 +55,8 @@ export async function PUT(
         receiptImagePath: receiptImagePath !== undefined ? receiptImagePath : undefined,
       },
     });
+    
+    console.log('Updated receipt:', receipt); // Debug log
 
     return NextResponse.json(receipt);
   } catch (error) {
@@ -64,6 +74,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     await prisma.receipt.delete({
       where: { id },

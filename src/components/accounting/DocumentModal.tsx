@@ -210,6 +210,18 @@ export default function DocumentModal({
           stageId: document.stageId || '' // اضافه کردن stageId
         });
         setEntries(document.entries);
+        
+        // Initialize inputValues with formatted amounts from document entries
+        const initialInputValues: {[key: string]: string} = {};
+        document.entries.forEach(entry => {
+          if (entry.debit > 0) {
+            initialInputValues[`${entry.id}-debit`] = formatNumberWithSeparators(String(entry.debit));
+          }
+          if (entry.credit > 0) {
+            initialInputValues[`${entry.id}-credit`] = formatNumberWithSeparators(String(entry.credit));
+          }
+        });
+        setInputValues(initialInputValues);
       } else {
         // Reset form for new document
         setFormData({
@@ -238,6 +250,7 @@ export default function DocumentModal({
           }
         ];
         setEntries(defaultEntries);
+        setInputValues({});
       }
       setError('');
     }

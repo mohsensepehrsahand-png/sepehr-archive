@@ -13,9 +13,11 @@ import {
   Alert,
   IconButton,
   Tooltip,
-  Breadcrumbs,
-  Link,
-  Chip
+  Chip,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel
 } from '@mui/material';
 import {
   AccountBalance,
@@ -87,6 +89,7 @@ export default function FiscalYearAccountingPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [project, setProject] = useState<Project | null>(null);
   const [fiscalYear, setFiscalYear] = useState<FiscalYear | null>(null);
+  const [allFiscalYears, setAllFiscalYears] = useState<FiscalYear[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [installmentTabValue, setInstallmentTabValue] = useState(0);
@@ -111,6 +114,13 @@ export default function FiscalYearAccountingPage() {
         }
         const fiscalYearData = await fiscalYearResponse.json();
         setFiscalYear(fiscalYearData);
+
+        // Fetch all fiscal years for dropdown
+        const allFiscalYearsResponse = await fetch(`/api/projects/${projectId}/fiscal-years`);
+        if (allFiscalYearsResponse.ok) {
+          const allFiscalYearsData = await allFiscalYearsResponse.json();
+          setAllFiscalYears(allFiscalYearsData);
+        }
         
         setError(null);
       } catch (error) {
@@ -149,6 +159,11 @@ export default function FiscalYearAccountingPage() {
 
   const handleBackToProject = () => {
     router.push(`/accounting/${projectId}`);
+  };
+
+  const handleFiscalYearChange = (event: any) => {
+    const newFiscalYearId = event.target.value;
+    router.push(`/accounting/${projectId}/${newFiscalYearId}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -257,47 +272,30 @@ export default function FiscalYearAccountingPage() {
     <Box>
       <Card>
         <CardContent>
-          {/* Breadcrumbs */}
-          <Breadcrumbs sx={{ mb: 2 }}>
-            <Link 
-              color="inherit" 
-              href="/accounting"
-              sx={{ textDecoration: 'none', cursor: 'pointer' }}
-            >
-              حسابداری
-            </Link>
-            <Link 
-              color="inherit" 
-              href={`/accounting/${projectId}`}
-              sx={{ textDecoration: 'none', cursor: 'pointer' }}
-            >
-              {project.name}
-            </Link>
-            <Typography color="text.primary">
-              سال مالی {fiscalYear.year}
-            </Typography>
-          </Breadcrumbs>
-
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <Box display="flex" alignItems="center" gap={2}>
               <IconButton onClick={handleBackToProject} size="small">
                 <ArrowBack />
               </IconButton>
-              <Box>
-                <Typography variant="h4" component="h1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {project.name}
-                  <Chip 
-                    icon={<CalendarMonth />}
-                    label={`سال مالی ${fiscalYear.year}`}
-                    color={fiscalYear.isActive ? 'primary' : 'default'}
-                    variant={fiscalYear.isClosed ? 'outlined' : 'filled'}
-                    size="small"
-                  />
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {formatDate(fiscalYear.startDate)} - {formatDate(fiscalYear.endDate)}
-                </Typography>
-              </Box>
+              <Typography variant="h4" component="h1">
+                {project.name}
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <InputLabel>سال مالی</InputLabel>
+                <Select
+                  value={fiscalYearId}
+                  onChange={handleFiscalYearChange}
+                  label="سال مالی"
+                >
+                  {allFiscalYears.map((fy) => (
+                    <MenuItem key={fy.id} value={fy.id}>
+                      سال مالی {fy.year}
+                      {fy.isActive && ' (سال جاری)'}
+                      {fy.isClosed && ' (بسته شده)'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
             <Box>
               <Tooltip title="بروزرسانی">

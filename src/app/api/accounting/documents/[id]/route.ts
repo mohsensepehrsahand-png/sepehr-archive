@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await request.json();
-    const { documentNumber, documentDate, description, entries } = body;
+    const { documentNumber, documentDate, description, entries, stageId } = body;
     const documentId = params.id;
 
     if (!documentNumber || !documentDate || !entries || entries.length === 0) {
@@ -51,6 +51,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         description,
         totalDebit,
         totalCredit,
+        stageId: stageId || null, // اضافه کردن stageId
         entries: {
           create: entries.map((entry: any) => ({
             accountCode: entry.accountCode,
@@ -63,7 +64,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         }
       },
       include: {
-        entries: true
+        entries: true,
+        stage: true // اضافه کردن اطلاعات مرحله
       }
     });
 

@@ -35,6 +35,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import AddReceiptDialog from "./AddReceiptDialog";
 import EditReceiptDialog from "./EditReceiptDialog";
+import EditPaymentDialog from "./EditPaymentDialog";
 import ReceiptImageViewer from "./ReceiptImageViewer";
 
 interface Receipt {
@@ -66,6 +67,7 @@ interface Installment {
   status: string;
   order?: number;
   paymentDate?: string;
+  dailyDelay?: number;
   payments?: Payment[];
 }
 
@@ -90,8 +92,10 @@ export default function InstallmentTable({
   const [receipts, setReceipts] = useState<Record<string, Receipt[]>>({});
   const [addReceiptDialogOpen, setAddReceiptDialogOpen] = useState(false);
   const [editReceiptDialogOpen, setEditReceiptDialogOpen] = useState(false);
+  const [editPaymentDialogOpen, setEditPaymentDialogOpen] = useState(false);
   const [selectedInstallmentId, setSelectedInstallmentId] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [loading, setLoading] = useState(false);
   const [receiptImageViewerOpen, setReceiptImageViewerOpen] = useState(false);
   const [selectedReceiptForView, setSelectedReceiptForView] = useState<Receipt | null>(null);
@@ -111,21 +115,40 @@ export default function InstallmentTable({
       newExpandedRows.delete(installmentId);
     } else {
       newExpandedRows.add(installmentId);
-      // Load receipts when expanding
-      await loadReceipts(installmentId);
+      // Check if we already have receipts for this installment
+      if (!receipts[installmentId]) {
+        await loadReceipts(installmentId);
+      }
     }
     setExpandedRows(newExpandedRows);
   };
 
   const loadReceipts = async (installmentId: string) => {
     try {
-      const response = await fetch(`/api/finance/receipts?installmentId=${installmentId}`);
-      if (response.ok) {
-        const receiptsData = await response.json();
+      console.log('Loading receipts for installment:', installmentId); // Debug log
+      // Try receipts API first
+      const receiptsResponse = await fetch(`/api/finance/receipts?installmentId=${installmentId}`);
+      if (receiptsResponse.ok) {
+        const receiptsData = await receiptsResponse.json();
+        console.log('Loaded receipts data:', receiptsData); // Debug log
         setReceipts(prev => ({
           ...prev,
           [installmentId]: receiptsData
         }));
+      } else {
+        console.log('No receipts found, trying payments API');
+        // If no receipts, try to get payments with receipt images
+        const paymentsResponse = await fetch(`/api/finance/payments?installmentId=${installmentId}&hasReceipt=true`);
+        if (paymentsResponse.ok) {
+          const paymentsData = await paymentsResponse.json();
+          console.log('Loaded payments data:', paymentsData); // Debug log
+          setReceipts(prev => ({
+            ...prev,
+            [installmentId]: paymentsData
+          }));
+        } else {
+          console.error('Failed to load receipts and payments:', receiptsResponse.status, paymentsResponse.status);
+        }
       }
     } catch (error) {
       console.error("Error loading receipts:", error);
@@ -181,6 +204,11 @@ export default function InstallmentTable({
     setEditReceiptDialogOpen(true);
   };
 
+  const handleEditPayment = (payment: Payment) => {
+    setSelectedPayment(payment);
+    setEditPaymentDialogOpen(true);
+  };
+
   const handleUpdateReceipt = async (receiptId: string, receiptData: {
     amount: number;
     receiptDate: string;
@@ -188,6 +216,7 @@ export default function InstallmentTable({
   }) => {
     try {
       setLoading(true);
+      console.log('Updating receipt:', receiptId, receiptData); // Debug log
       const response = await fetch(`/api/finance/receipts/${receiptId}`, {
         method: "PUT",
         headers: {
@@ -211,6 +240,43 @@ export default function InstallmentTable({
       }
     } catch (error) {
       console.error("Error updating receipt:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePayment = async (paymentId: string, paymentData: {
+    amount: number;
+    paymentDate: string;
+    description: string;
+  }) => {
+    try {
+      setLoading(true);
+      console.log('Updating payment:', paymentId, paymentData); // Debug log
+      const response = await fetch(`/api/finance/payments/${paymentId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(paymentData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "خطا در به‌روزرسانی پرداخت");
+      }
+
+      // Reload receipts for this installment
+      if (selectedInstallmentId) {
+        await loadReceipts(selectedInstallmentId);
+      }
+      
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error("Error updating payment:", error);
       throw error;
     } finally {
       setLoading(false);
@@ -252,6 +318,7 @@ export default function InstallmentTable({
   const getStatusChip = (status: string) => {
     const statusConfig = {
       "پرداخت شده": { color: "success" as const },
+      "پرداخت با تاخیر": { color: "warning" as const },
       "بخشی پرداخت شده": { color: "warning" as const },
       "در انتظار پرداخت": { color: "default" as const },
       "معوق": { color: "error" as const }
@@ -306,6 +373,9 @@ export default function InstallmentTable({
                 وضعیت
               </TableCell>
               <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
+                تاخیر روزانه
+              </TableCell>
+              <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
                 عملیات
               </TableCell>
               <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold', width: '50px' }}>
@@ -316,7 +386,8 @@ export default function InstallmentTable({
           <TableBody>
             {installments.map((installment, index) => {
               const isExpanded = expandedRows.has(installment.id);
-              const installmentReceipts = receipts[installment.id] || [];
+              // Use receipts from state if available, otherwise use payments from installment data
+              const installmentReceipts = receipts[installment.id] || installment.payments || [];
               
               return (
                 <React.Fragment key={installment.id}>
@@ -344,6 +415,9 @@ export default function InstallmentTable({
                     </TableCell>
                     <TableCell align="center">
                       {getStatusChip(installment.status)}
+                    </TableCell>
+                    <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                      {installment.dailyDelay || 0} روز
                     </TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
@@ -381,7 +455,7 @@ export default function InstallmentTable({
                   </TableRow>
                   
                   <TableRow>
-                    <TableCell colSpan={9} sx={{ py: 0, border: 0 }}>
+                    <TableCell colSpan={10} sx={{ py: 0, border: 0 }}>
                       <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                         <Box sx={{ margin: 1 }}>
                           <Card variant="outlined">
@@ -446,62 +520,71 @@ export default function InstallmentTable({
                                     </TableRow>
                                   </TableHead>
                                   <TableBody>
-                                    {installmentReceipts.map((receipt) => (
-                                      <TableRow key={receipt.id}>
-                                        <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
-                                          {receipt.receiptNumber}
-                                        </TableCell>
-                                        <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
-                                          {formatCurrency(receipt.amount)}
-                                        </TableCell>
-                                        <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
-                                          {receipt.receiptDate ? formatDate(receipt.receiptDate) : '-'}
-                                        </TableCell>
-                                        <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
-                                          {receipt.description || '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                                            {isAdmin && (
+                                    {installmentReceipts.map((item) => {
+                                      // Check if this is a Payment or Receipt object
+                                      const isPayment = 'paymentDate' in item;
+                                      const itemAsPayment = item as any;
+                                      
+                                      return (
+                                        <TableRow key={item.id}>
+                                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                                            {itemAsPayment.receiptNumber || `P${item.id.slice(-6)}`}
+                                          </TableCell>
+                                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                                            {formatCurrency(item.amount)}
+                                          </TableCell>
+                                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                                            {isPayment ? 
+                                              (itemAsPayment.paymentDate ? formatDate(itemAsPayment.paymentDate) : '-') :
+                                              (itemAsPayment.receiptDate ? formatDate(itemAsPayment.receiptDate) : '-')
+                                            }
+                                          </TableCell>
+                                          <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                                            {item.description || '-'}
+                                          </TableCell>
+                                          <TableCell>
+                                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                              {isAdmin && (
+                                                <Button
+                                                  size="small"
+                                                  variant="outlined"
+                                                  color="primary"
+                                                  startIcon={<Edit />}
+                                                  onClick={() => isPayment ? handleEditPayment(itemAsPayment) : handleEditReceipt(itemAsPayment)}
+                                                  sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+                                                >
+                                                  ویرایش
+                                                </Button>
+                                              )}
+                                              
                                               <Button
                                                 size="small"
                                                 variant="outlined"
-                                                color="primary"
-                                                startIcon={<Edit />}
-                                                onClick={() => handleEditReceipt(receipt)}
+                                                color="info"
+                                                startIcon={<Visibility />}
+                                                onClick={() => handleViewReceipt(itemAsPayment)}
                                                 sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
                                               >
-                                                ویرایش
+                                                نمایش
                                               </Button>
-                                            )}
-                                            
-                                            <Button
-                                              size="small"
-                                              variant="outlined"
-                                              color="info"
-                                              startIcon={<Visibility />}
-                                              onClick={() => handleViewReceipt(receipt)}
-                                              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
-                                            >
-                                              نمایش
-                                            </Button>
-                                            
-                                            {isAdmin && (
-                                              <Button
-                                                size="small"
-                                                variant="outlined"
-                                                color="error"
-                                                startIcon={<Delete />}
-                                                onClick={() => handleDeleteReceipt(receipt.id)}
-                                                sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
-                                              >
-                                                حذف
-                                              </Button>
-                                            )}
-                                          </Box>
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
+                                              
+                                              {isAdmin && (
+                                                <Button
+                                                  size="small"
+                                                  variant="outlined"
+                                                  color="error"
+                                                  startIcon={<Delete />}
+                                                  onClick={() => handleDeleteReceipt(item.id)}
+                                                  sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+                                                >
+                                                  حذف
+                                                </Button>
+                                              )}
+                                            </Box>
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
                                   </TableBody>
                                 </Table>
                               ) : (
@@ -545,6 +628,17 @@ export default function InstallmentTable({
         }}
         onSave={handleUpdateReceipt}
         receipt={selectedReceipt}
+      />
+
+      {/* Edit Payment Dialog */}
+      <EditPaymentDialog
+        open={editPaymentDialogOpen}
+        onClose={() => {
+          setEditPaymentDialogOpen(false);
+          setSelectedPayment(null);
+        }}
+        onSave={handleUpdatePayment}
+        payment={selectedPayment}
       />
 
       {/* Receipt Image Viewer */}

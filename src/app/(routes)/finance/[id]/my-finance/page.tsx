@@ -214,12 +214,14 @@ export default function MyFinancePage({ params }: { params: Promise<{ id: string
             paidAmount: installment.paidAmount,
             remainingAmount: installment.remainingAmount,
             status: installment.status === 'PAID' ? 'پرداخت شده' : 
+                   installment.status === 'PAID_WITH_DELAY' ? 'پرداخت با تاخیر' :
                    installment.status === 'PARTIAL' ? 'بخشی پرداخت شده' :
                    installment.status === 'OVERDUE' ? 'معوق' : 'در انتظار پرداخت',
             order: installment.order || 0,
             paymentDate: installment.payments && installment.payments.length > 0 
               ? installment.payments[installment.payments.length - 1].paymentDate
               : undefined,
+            dailyDelay: installment.dailyDelay,
             payments: installment.payments ? installment.payments.map(payment => ({
               id: payment.id,
               amount: payment.amount,

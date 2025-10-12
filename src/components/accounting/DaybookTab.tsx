@@ -315,9 +315,18 @@ export default function DaybookTab({ projectId }: DaybookTabProps) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {documents.map((document) => 
-                  document.entries.map((entry, entryIndex) => (
-                    <TableRow key={`${document.id}-${entry.id}`}>
+                {documents.map((document) => {
+                  const isOpeningEntry = document.description?.includes('افتتاحیه');
+                  return document.entries.map((entry, entryIndex) => (
+                    <TableRow 
+                      key={`${document.id}-${entry.id}`}
+                      sx={{
+                        backgroundColor: isOpeningEntry ? 'rgba(76, 175, 80, 0.08)' : 'transparent',
+                        '&:hover': {
+                          backgroundColor: isOpeningEntry ? 'rgba(76, 175, 80, 0.15)' : 'rgba(0, 0, 0, 0.04)'
+                        }
+                      }}
+                    >
                       <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
                         {formatDate(document.documentDate)}
                       </TableCell>
@@ -340,8 +349,8 @@ export default function DaybookTab({ projectId }: DaybookTabProps) {
                         {entry.credit > 0 ? entry.credit.toLocaleString('fa-IR') : '-'}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
+                  ));
+                })}
               </TableBody>
             </Table>
           </TableContainer>

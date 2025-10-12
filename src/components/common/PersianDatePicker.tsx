@@ -69,61 +69,59 @@ export default function PersianDatePicker({
   fullWidth = true
 }: PersianDatePickerProps) {
   const [internalValue, setInternalValue] = useState<DateObject | null>(null);
-  const [isUserInteracting, setIsUserInteracting] = useState(false);
-  const lastValidValue = useRef<string>('');
   
   // Update internal value when external value changes
   useEffect(() => {
-    if (!isUserInteracting) {
-      if (!value || value.trim() === '') {
-        setInternalValue(null);
-        lastValidValue.current = '';
-      } else {
-        try {
-          const date = new Date(value);
-          if (!isNaN(date.getTime())) {
-            const persianDate = new DateObject({ date, calendar: persian, locale: persian_fa });
-            setInternalValue(persianDate);
-            lastValidValue.current = value;
-          }
-        } catch {
-          setInternalValue(null);
-          lastValidValue.current = '';
+    console.log('PersianDatePicker: useEffect triggered with value:', value);
+    
+    if (!value || value.trim() === '') {
+      console.log('PersianDatePicker: Value is empty, setting to null');
+      setInternalValue(null);
+    } else {
+      try {
+        const date = new Date(value);
+        console.log('PersianDatePicker: Parsed date:', date);
+        
+        if (!isNaN(date.getTime())) {
+          const persianDate = new DateObject({ date, calendar: persian, locale: persian_fa });
+          console.log('PersianDatePicker: Created Persian date:', persianDate);
+          setInternalValue(persianDate);
         }
+      } catch (error) {
+        console.error('PersianDatePicker: Error parsing date:', error);
+        setInternalValue(null);
       }
     }
-  }, [value, isUserInteracting]);
+  }, [value]);
 
   const handleDateChange = (date: DateObject | DateObject[] | null) => {
+    console.log('PersianDatePicker: handleDateChange called with:', date);
+    
     if (date === null || date === undefined) {
+      console.log('PersianDatePicker: Date is null/undefined, clearing value');
       setInternalValue(null);
-      setIsUserInteracting(false);
       onChange('');
       return;
     }
     
     if (Array.isArray(date)) {
+      console.log('PersianDatePicker: Date is array, ignoring');
       return;
     }
     
     try {
-      setIsUserInteracting(true);
       setInternalValue(date);
       
       // Convert to ISO string
       const isoDate = date.toDate().toISOString().split('T')[0];
+      console.log('PersianDatePicker: Converted to ISO date:', isoDate);
       
       if (isoDate !== 'Invalid Date') {
-        lastValidValue.current = isoDate;
         onChange(isoDate);
       }
     } catch (error) {
-      // Silent error handling
+      console.error('PersianDatePicker: Error converting date:', error);
     }
-  };
-
-  const handleCalendarClose = () => {
-    setIsUserInteracting(false);
   };
 
   return (
@@ -134,16 +132,14 @@ export default function PersianDatePicker({
           <DatePicker
           value={internalValue}
           onChange={handleDateChange}
-          onCalendarClose={handleCalendarClose}
           calendar={persian}
           locale={persian_fa}
           calendarPosition="bottom-right"
           disabled={disabled}
-          onlyShowInPopover={true}
           hideOnSelect={true}
           autoSelect={false}
           format="YYYY/MM/DD"
-          editable={false}
+          editable={true}
           style={{
             fontFamily: 'Vazirmatn, Arial, sans-serif',
             width: '100%',

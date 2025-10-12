@@ -60,6 +60,18 @@ export async function GET(
     const userData = project.units[0].user;
     const userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.username;
 
+    // Get user penalty settings
+    const userSettings = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        penaltyGraceDays: true,
+        dailyPenaltyAmount: true
+      }
+    });
+
+    const penaltyGraceDays = userSettings?.penaltyGraceDays || 0;
+    const dailyPenaltyAmount = userSettings?.dailyPenaltyAmount || 0;
+
     // Get all user installments and sort by order field
     const userInstallments = project.units
       .flatMap(unit => unit.userInstallments)
@@ -74,9 +86,8 @@ export async function GET(
         return paymentSum + (payment.amount > 0 && !payment.receiptImagePath ? payment.amount : 0);
       }, 0) : 0), 0
     );
-    const totalPenaltyAmount = userInstallments.reduce((sum, inst) => 
-      sum + (inst.penalties ? inst.penalties.reduce((penaltySum, penalty) => penaltySum + penalty.totalPenalty, 0) : 0), 0
-    );
+    // Calculate total penalty amount from penalties array (will be calculated later)
+    let totalPenaltyAmount = 0;
     const remainingAmount = totalShareAmount - totalPaidAmount;
     const paidPercentage = totalShareAmount > 0 ? Math.round((totalPaidAmount / totalShareAmount) * 100) : 0;
 
@@ -98,11 +109,44 @@ export async function GET(
       
       
       const dueDate = inst.isCustomized && inst.dueDate ? inst.dueDate : inst.installmentDefinition?.dueDate;
-      const status = dueDate ? FinancialCalculator.calculateInstallmentStatus(
+      let status = dueDate ? FinancialCalculator.calculateInstallmentStatus(
         inst.shareAmount,
         paidAmount,
         new Date(dueDate)
       ) : 'PENDING';
+
+      // Override status for delayed payments
+      if (status === 'PAID' && inst.payments && inst.payments.length > 0) {
+        const latestPayment = inst.payments
+          .sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())[0];
+        
+        if (latestPayment && dueDate) {
+          const paymentDateObj = new Date(latestPayment.paymentDate);
+          const dueDateObj = new Date(dueDate);
+          const daysDifference = Math.ceil((paymentDateObj.getTime() - dueDateObj.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysDifference > penaltyGraceDays) {
+            status = 'PAID_WITH_DELAY';
+          }
+        }
+      }
+
+      // Calculate daily delay
+      let dailyDelay = 0;
+      if (inst.payments && inst.payments.length > 0) {
+        const latestPayment = inst.payments
+          .sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())[0];
+        
+        if (latestPayment && dueDate) {
+          const paymentDateObj = new Date(latestPayment.paymentDate);
+          const dueDateObj = new Date(dueDate);
+          const daysDifference = Math.ceil((paymentDateObj.getTime() - dueDateObj.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysDifference > penaltyGraceDays) {
+            dailyDelay = daysDifference - penaltyGraceDays;
+          }
+        }
+      }
 
       return {
         id: inst.id,
@@ -115,6 +159,7 @@ export async function GET(
         order: inst.order || inst.installmentDefinition?.order || 0,
         installmentDefinitionId: inst.installmentDefinitionId,
         isCustomized: inst.isCustomized,
+        dailyDelay,
         payments: inst.payments.map(payment => ({
           id: payment.id,
           paymentDate: payment.paymentDate,
@@ -125,19 +170,28 @@ export async function GET(
       };
     });
 
-    // Format penalties data
-    const penalties = userInstallments.flatMap((inst, instIndex) => 
-      inst.penalties.map(penalty => ({
-        id: penalty.id,
-        installmentTitle: inst.installmentDefinition.title,
-        installmentNumber: instIndex + 1,
-        daysLate: penalty.daysLate,
-        dailyRate: penalty.dailyRate,
-        totalPenalty: penalty.totalPenalty,
-        createdAt: penalty.createdAt,
+    // Format penalties data based on dailyDelay from installments
+    const penalties = installments
+      .filter(inst => inst.dailyDelay > 0)
+      .map((inst, index) => ({
+        id: `penalty-${inst.id}`,
+        installmentTitle: inst.title,
+        installmentNumber: inst.order,
+        daysLate: inst.dailyDelay,
+        dailyRate: dailyPenaltyAmount,
+        totalPenalty: inst.dailyDelay * dailyPenaltyAmount,
+        createdAt: new Date().toISOString(),
         reason: 'تأخیر در پرداخت'
-      }))
-    );
+      }));
+
+    // Update total penalty amount based on calculated penalties
+    totalPenaltyAmount = penalties.reduce((sum, penalty) => sum + penalty.totalPenalty, 0);
+
+    // Update summary with correct total penalty amount
+    const updatedSummary = {
+      ...summary,
+      totalPenaltyAmount
+    };
 
     // Get penalty rate (this could be stored in project settings or app settings)
     const penaltyRate = 0.1; // Default 0.1% per day
@@ -145,7 +199,7 @@ export async function GET(
     return NextResponse.json({
       userName,
       projectName: project.name,
-      summary,
+      summary: updatedSummary,
       installments,
       penalties,
       penaltyRate

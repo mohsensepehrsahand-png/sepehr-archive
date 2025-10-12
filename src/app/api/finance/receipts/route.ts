@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@/generated/prisma";
-import { useAuth } from "@/contexts/AuthContext";
+import { getCurrentUser } from "@/app/api/_lib/db";
 
 const prisma = new PrismaClient();
 
 // GET /api/finance/receipts?installmentId=xxx
 export async function GET(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const installmentId = searchParams.get("installmentId");
 
@@ -36,6 +41,11 @@ export async function GET(request: NextRequest) {
 // POST /api/finance/receipts
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { userInstallmentId, amount, receiptDate, description, receiptImagePath } = body;
 

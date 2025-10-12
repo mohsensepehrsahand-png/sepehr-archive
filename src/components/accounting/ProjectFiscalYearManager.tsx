@@ -28,8 +28,74 @@ import {
   Menu,
   MenuItem,
 } from '@mui/material';
-import { CalendarMonth, AddCircleOutline, Delete, Edit, MoreVert } from '@mui/icons-material';
+import { CalendarMonth, AddCircleOutline, Delete, Edit, MoreVert, PlayArrow } from '@mui/icons-material';
 import PersianDatePicker from '../common/PersianDatePicker';
+import { DateObject } from 'react-multi-date-picker';
+import persian from "react-date-object/calendars/persian";
+import persian_fa from "react-date-object/locales/persian_fa";
+
+// Helper function to convert Persian year to Gregorian dates using the library
+const getPersianFiscalYearDates = (persianYear: number) => {
+  try {
+    // Create Persian dates for Farvardin 1 and Esfand 29
+    const startPersianDate = new DateObject({
+      year: persianYear,
+      month: 1, // Farvardin
+      day: 1,
+      calendar: persian,
+      locale: persian_fa
+    });
+    
+    // Try to get the last day of Esfand (29 or 30 depending on leap year)
+    let endPersianDate;
+    try {
+      // First try with day 30
+      endPersianDate = new DateObject({
+        year: persianYear,
+        month: 12, // Esfand
+        day: 30,
+        calendar: persian,
+        locale: persian_fa
+      });
+    } catch (error) {
+      // If day 30 doesn't exist, use day 29
+      endPersianDate = new DateObject({
+        year: persianYear,
+        month: 12, // Esfand
+        day: 29,
+        calendar: persian,
+        locale: persian_fa
+      });
+    }
+    
+    return {
+      startDate: startPersianDate.toDate().toISOString().split('T')[0],
+      endDate: endPersianDate.toDate().toISOString().split('T')[0]
+    };
+  } catch (error) {
+    // Fallback to approximate calculation
+    const gregorianStartYear = persianYear + 621;
+    const startDate = new Date(gregorianStartYear, 2, 21);
+    const endDate = new Date(gregorianStartYear + 1, 2, 20);
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    };
+  }
+};
+
+// Get current Persian year using the library
+const getCurrentPersianYear = () => {
+  try {
+    const now = new Date();
+    const persianDate = new DateObject({ date: now, calendar: persian, locale: persian_fa });
+    return persianDate.year;
+  } catch (error) {
+    // Fallback to approximate calculation
+    const now = new Date();
+    return now.getFullYear() - 621;
+  }
+};
 
 interface Project {
   id: string;
@@ -119,6 +185,33 @@ const ProjectFiscalYearManager: React.FC<{ project: Project }> = ({ project }) =
         throw new Error(error || 'Failed to create fiscal year');
       }
       handleClose();
+      fetchFiscalYears();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error');
+    }
+  };
+
+  const handleCreateCurrentYear = async () => {
+    try {
+      const currentPersianYear = getCurrentPersianYear();
+      const { startDate, endDate } = getPersianFiscalYearDates(currentPersianYear);
+      
+      const response = await fetch(`/api/projects/${project.id}/fiscal-years`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          year: currentPersianYear,
+          startDate,
+          endDate,
+          description: `سال مالی ${currentPersianYear}`
+        }),
+      });
+      
+      if (!response.ok) {
+        const { error } = await response.json();
+        throw new Error(error || 'Failed to create current fiscal year');
+      }
+      
       fetchFiscalYears();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error');
@@ -313,15 +406,31 @@ const ProjectFiscalYearManager: React.FC<{ project: Project }> = ({ project }) =
         ))}
       </Box>
 
-      <Button
-        variant="outlined"
-        size="small"
-        startIcon={<AddCircleOutline />}
-        onClick={handleOpen}
-        sx={{ mt: 1, fontSize: '0.75rem', py: 0.5 }}
-      >
-        سال مالی جدید
-      </Button>
+      <Box display="flex" gap={1} mt={1}>
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<PlayArrow />}
+          onClick={handleCreateCurrentYear}
+          sx={{ 
+            fontSize: '0.75rem', 
+            py: 0.5,
+            fontFamily: 'Vazirmatn, Arial, sans-serif',
+            fontWeight: 'bold'
+          }}
+        >
+          ایجاد سال جاری
+        </Button>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<AddCircleOutline />}
+          onClick={handleOpen}
+          sx={{ fontSize: '0.75rem', py: 0.5 }}
+        >
+          سال مالی جدید
+        </Button>
+      </Box>
 
       <Dialog 
         open={open} 

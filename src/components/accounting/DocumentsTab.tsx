@@ -44,10 +44,13 @@ import {
   ArrowDownward,
   CheckCircle,
   Schedule,
-  FilterList
+  FilterList,
+  Print
 } from '@mui/icons-material';
 import DocumentModal from './DocumentModal';
 import AccountSelectorModal from './AccountSelectorModal';
+import AccountingDocumentPrint from './AccountingDocumentPrint';
+import { useRef } from 'react';
 import { useTableFilters, TableFilters } from '@/components/common';
 import DateFilterModal from './DateFilterModal';
 
@@ -79,6 +82,7 @@ interface DocumentsTabProps {
 }
 
 export default function DocumentsTab({ projectId }: DocumentsTabProps) {
+  const printRef = useRef<HTMLDivElement | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -91,6 +95,7 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
   const [statusChangeMessage, setStatusChangeMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'warning'>('success');
+  const [printModalOpen, setPrintModalOpen] = useState(false);
   
   // Sorting states
   const [sortField, setSortField] = useState<keyof Document | null>(null);
@@ -101,6 +106,55 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
   
   // Date filter modal state
   const [dateFilterModalOpen, setDateFilterModalOpen] = useState(false);
+  const handlePrint = () => {
+    const node = printRef.current;
+    if (!node) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map((el) => el.outerHTML)
+      .join('');
+
+    const html = `<!doctype html>
+      <html dir="rtl">
+        <head>
+          <meta charset="utf-8" />
+          <title>پرینت سند حسابداری</title>
+          <style>
+            /* Tight margins, signatures fixed at absolute bottom */
+            @page { size: A4; margin: 10mm 10mm 10mm 10mm; }
+            html, body { -webkit-print-color-adjust: exact; color-adjust: exact; margin:0; padding:0; background:#fff; }
+            body { font-family: 'Vazirmatn', Arial, sans-serif; }
+            .MuiPaper-root { box-shadow: none !important; border: none !important; }
+            :root { --footer-h: 28mm; }
+            .print-root { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+            .print-header { position: static !important; }
+            .print-body { position: relative; padding-bottom: calc(var(--footer-h) + 6mm); }
+            .print-footer { position: fixed; bottom: 10mm; left: 10mm; right: 10mm; height: var(--footer-h); background: #fff; }
+            table { page-break-inside: auto; width: 100%; border-collapse: collapse; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+          </style>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">
+          ${styles}
+        </head>
+        <body>${node.innerHTML}</body>
+      </html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
 
   // Stage filter state
   const [stages, setStages] = useState<Array<{id: string, title: string}>>([]);
@@ -399,6 +453,11 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
     }
   };
 
+  const handlePrintDocument = (document: Document) => {
+    setSelectedDocument(document);
+    setPrintModalOpen(true);
+  };
+
 
   const handleSaveDocument = async (documentData: Omit<Document, 'id'>) => {
     try {
@@ -648,8 +707,19 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {finalFilteredDocuments.map((document, index) => (
-              <TableRow key={document.id} sx={{ '& .MuiTableCell-root': { py: 0.5 } }}>
+            {finalFilteredDocuments.map((document, index) => {
+              const isOpeningEntry = document.description?.includes('افتتاحیه');
+              return (
+              <TableRow 
+                key={document.id} 
+                sx={{ 
+                  '& .MuiTableCell-root': { py: 0.5 },
+                  backgroundColor: isOpeningEntry ? 'rgba(76, 175, 80, 0.08)' : 'transparent',
+                  '&:hover': {
+                    backgroundColor: isOpeningEntry ? 'rgba(76, 175, 80, 0.15)' : 'rgba(0, 0, 0, 0.04)'
+                  }
+                }}
+              >
                 <TableCell sx={{ textAlign: 'center' }}>{index + 1}</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>{document.documentNumber}</TableCell>
                 <TableCell sx={{ textAlign: 'center' }}>{formatDate(document.documentDate)}</TableCell>
@@ -714,6 +784,15 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
                       <Visibility />
                     </IconButton>
                   </Tooltip>
+                  <Tooltip title="پرینت سند">
+                    <IconButton 
+                      size="small" 
+                      onClick={() => handlePrintDocument(document)}
+                      color="primary"
+                    >
+                      <Print />
+                    </IconButton>
+                  </Tooltip>
                   {document.status === 'TEMPORARY' && (
                     <Tooltip title="ویرایش">
                       <IconButton 
@@ -735,7 +814,8 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
                   </Tooltip>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
             {finalFilteredDocuments.length === 0 && (
               <TableRow sx={{ '& .MuiTableCell-root': { py: 1 } }}>
                 <TableCell colSpan={8} align="center">
@@ -924,6 +1004,62 @@ export default function DocumentsTab({ projectId }: DocumentsTabProps) {
         onApply={setDateFilter}
         currentFilter={filters.dateFilter}
       />
+
+      {/* Print Modal */}
+      <Dialog
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            maxHeight: '90vh',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          fontFamily: 'Vazirmatn, Arial, sans-serif',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <Box component="span" sx={{ 
+            fontFamily: 'Vazirmatn, Arial, sans-serif',
+            fontSize: '1.25rem',
+            fontWeight: 500
+          }}>
+            پرینت سند حسابداری
+          </Box>
+          <Box>
+            <Button
+              variant="contained"
+              startIcon={<Print />}
+              onClick={handlePrint}
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', mr: 1 }}
+            >
+              پرینت
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setPrintModalOpen(false)}
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}
+            >
+              بستن
+            </Button>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ padding: 0, overflow: 'auto' }}>
+          <div ref={printRef}>
+            {selectedDocument && (
+              <AccountingDocumentPrint 
+                document={selectedDocument}
+                projectName="پروژه معراج"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </Box>
   );

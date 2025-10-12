@@ -12,6 +12,7 @@ interface Installment {
   remainingAmount: number;
   status: string;
   order: number;
+  dailyDelay?: number;
 }
 
 export default function UserInstallmentsPage({ params }: { params: Promise<{ id: string; userId: string }> }) {

@@ -650,8 +650,11 @@ export default function Daybook({ projectId }: DaybookProps) {
                   .map((document, docIndex) => 
                     document.entries.map((entry, entryIndex) => {
                       // تعیین رنگ بر اساس شماره سند (یکی در میان)
+                      const isOpeningEntry = document.description?.includes('افتتاحیه');
                       const isEvenDocument = docIndex % 2 === 0;
-                      const backgroundColor = isEvenDocument ? '#ffffff' : '#f8f9fa';
+                      const backgroundColor = isOpeningEntry 
+                        ? 'rgba(76, 175, 80, 0.08)' 
+                        : (isEvenDocument ? '#ffffff' : '#f8f9fa');
                       
                       return (
                         <TableRow 
@@ -905,8 +908,11 @@ export default function Daybook({ projectId }: DaybookProps) {
               <TableBody>
                 {sortedDocuments.map((document, docIndex) => 
                   document.entries.map((entry, entryIndex) => {
+                    const isOpeningEntry = document.description?.includes('افتتاحیه');
                     const isEvenDocument = docIndex % 2 === 0;
-                    const backgroundColor = isEvenDocument ? '#ffffff' : '#f8f9fa';
+                    const backgroundColor = isOpeningEntry 
+                      ? 'rgba(76, 175, 80, 0.08)' 
+                      : (isEvenDocument ? '#ffffff' : '#f8f9fa');
                     
                     return (
                       <TableRow key={`${document.id}-${entry.id}`} sx={{ backgroundColor }}>

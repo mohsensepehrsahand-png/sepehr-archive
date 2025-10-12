@@ -186,6 +186,7 @@ export default function AddReceiptDialog({
           />
           
           <PersianDatePicker
+            key={`receipt-${installmentTitle}`} // Force re-render when installment changes
             value={receiptDate}
             onChange={setReceiptDate}
             label="تاریخ فیش"

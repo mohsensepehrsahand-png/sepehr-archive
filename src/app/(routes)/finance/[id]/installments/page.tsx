@@ -13,7 +13,8 @@ export default async function InstallmentsPage({ params }: { params: Promise<{ i
       shareAmount: 10000000,
       paidAmount: 10000000,
       remainingAmount: 0,
-      status: "PAID"
+      status: "PAID",
+      dailyDelay: 0
     },
     {
       id: "2", 
@@ -22,7 +23,8 @@ export default async function InstallmentsPage({ params }: { params: Promise<{ i
       shareAmount: 10000000,
       paidAmount: 5000000,
       remainingAmount: 5000000,
-      status: "PARTIAL"
+      status: "PARTIAL",
+      dailyDelay: 0
     },
     {
       id: "3",
@@ -31,7 +33,8 @@ export default async function InstallmentsPage({ params }: { params: Promise<{ i
       shareAmount: 10000000,
       paidAmount: 0,
       remainingAmount: 10000000,
-      status: "PENDING"
+      status: "PENDING",
+      dailyDelay: 0
     },
     {
       id: "4",
@@ -40,7 +43,8 @@ export default async function InstallmentsPage({ params }: { params: Promise<{ i
       shareAmount: 10000000,
       paidAmount: 0,
       remainingAmount: 10000000,
-      status: "OVERDUE"
+      status: "OVERDUE",
+      dailyDelay: 0
     },
     {
       id: "5",
@@ -49,7 +53,8 @@ export default async function InstallmentsPage({ params }: { params: Promise<{ i
       shareAmount: 10000000,
       paidAmount: 0,
       remainingAmount: 10000000,
-      status: "PENDING"
+      status: "PENDING",
+      dailyDelay: 0
     }
   ];
 

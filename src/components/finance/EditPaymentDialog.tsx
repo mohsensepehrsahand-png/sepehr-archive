@@ -42,14 +42,24 @@ export default function EditPaymentDialog({
 
   useEffect(() => {
     if (payment) {
+      console.log('EditPaymentDialog: Setting payment data:', payment);
       setAmount(payment.amount.toString());
-      setPaymentDate(new Date(payment.paymentDate).toISOString().split('T')[0]);
+      const dateStr = new Date(payment.paymentDate).toISOString().split('T')[0];
+      console.log('EditPaymentDialog: Setting payment date:', dateStr);
+      setPaymentDate(dateStr);
       setDescription(payment.description || "");
     }
   }, [payment]);
 
   const handleSave = async () => {
     if (!payment) return;
+
+    console.log('EditPaymentDialog: Saving payment with data:', {
+      id: payment.id,
+      amount: parseFloat(amount),
+      paymentDate,
+      description
+    });
 
     // Validate amount and date for both receipts and payments
     if (!amount || !paymentDate) {
@@ -114,8 +124,12 @@ export default function EditPaymentDialog({
           />
 
           <PersianDatePicker
+            key={payment?.id || 'new'} // Force re-render when payment changes
             value={paymentDate}
-            onChange={setPaymentDate}
+            onChange={(date) => {
+              console.log('EditPaymentDialog: Payment date changed to:', date); // Debug log
+              setPaymentDate(date);
+            }}
             label={payment?.receiptImagePath ? "تاریخ فیش" : "تاریخ پرداخت"}
             disabled={loading}
             helperText={payment?.receiptImagePath ? "تاریخ فیش روی محاسبات قسط تأثیر نمی‌گذارد" : undefined}
@@ -156,4 +170,3 @@ export default function EditPaymentDialog({
     </Dialog>
   );
 }
-

@@ -13,7 +13,10 @@ export async function PUT(
     }
 
     const paymentId = params.paymentId;
-    const { amount, paymentDate, description } = await request.json();
+    const body = await request.json();
+    const { amount, paymentDate, description } = body;
+    
+    console.log('Payment update request:', { paymentId, body }); // Debug log
 
     // Validate input
     if (!amount || !paymentDate) {
@@ -62,6 +65,8 @@ export async function PUT(
         description: description || null
       }
     });
+    
+    console.log('Updated payment:', updatedPayment); // Debug log
 
     return NextResponse.json({
       message: "پرداخت با موفقیت به‌روزرسانی شد",

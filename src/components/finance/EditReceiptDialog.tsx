@@ -50,7 +50,9 @@ export default function EditReceiptDialog({
   useEffect(() => {
     if (receipt) {
       setAmount(receipt.amount);
-      setReceiptDate(receipt.receiptDate ? new Date(receipt.receiptDate).toISOString().split('T')[0] : "");
+      const dateStr = receipt.receiptDate ? new Date(receipt.receiptDate).toISOString().split('T')[0] : "";
+      console.log('Setting receipt date:', dateStr); // Debug log
+      setReceiptDate(dateStr);
       setDescription(receipt.description || "");
     }
   }, [receipt]);
@@ -62,11 +64,14 @@ export default function EditReceiptDialog({
       setLoading(true);
       setError("");
       
-      await onSave(receipt.id, {
+      const saveData = {
         amount,
         receiptDate,
         description,
-      });
+      };
+      console.log('Saving receipt data:', saveData); // Debug log
+      
+      await onSave(receipt.id, saveData);
       
       onClose();
     } catch (err) {
@@ -143,8 +148,12 @@ export default function EditReceiptDialog({
           />
           
           <PersianDatePicker
+            key={receipt?.id || 'new'} // Force re-render when receipt changes
             value={receiptDate}
-            onChange={setReceiptDate}
+            onChange={(date) => {
+              console.log('Date changed to:', date); // Debug log
+              setReceiptDate(date);
+            }}
             label="تاریخ فیش"
           />
           

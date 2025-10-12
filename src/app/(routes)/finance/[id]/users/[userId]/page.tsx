@@ -231,13 +231,15 @@ export default function FinanceUserPage({ params }: { params: Promise<{ id: stri
             installmentDefinitionId: installmentData.installmentDefinitionId || null,
             title: installmentData.title,
             dueDate: installmentData.dueDate,
-            paymentDate: installmentData.paymentDate
+            paymentDate: installmentData.paymentDate || null
           }
         : {
             ...installmentData,
             userId,
             projectId
           };
+      
+      console.log('Sending installment data:', requestBody);
       
       const response = await fetch(url, {
         method,
@@ -467,12 +469,14 @@ export default function FinanceUserPage({ params }: { params: Promise<{ id: stri
             paidAmount: installment.paidAmount,
             remainingAmount: installment.remainingAmount,
             status: installment.status === 'PAID' ? 'پرداخت شده' : 
+                   installment.status === 'PAID_WITH_DELAY' ? 'پرداخت با تاخیر' :
                    installment.status === 'PARTIAL' ? 'بخشی پرداخت شده' :
                    installment.status === 'OVERDUE' ? 'معوق' : 'در انتظار پرداخت',
             order: installment.order,
             paymentDate: installment.payments.length > 0 
               ? installment.payments[installment.payments.length - 1].paymentDate
               : undefined,
+            dailyDelay: installment.dailyDelay,
             payments: installment.payments.map(payment => ({
               id: payment.id,
               amount: payment.amount,
@@ -507,32 +511,33 @@ export default function FinanceUserPage({ params }: { params: Promise<{ id: stri
           sx={{ 
             fontFamily: 'Vazirmatn, Arial, sans-serif',
             fontWeight: 'bold',
-            mb: 3
+            mb: 3,
+            textAlign: 'center'
           }}
         >
-          جدول جریمه‌ها (فقط نمایشی)
+          جدول جریمه‌ها
         </Typography>
         
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
+                <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
                   شماره قسط
                 </TableCell>
-                <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
+                <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
                   عنوان قسط
                 </TableCell>
                 <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
                   روزهای تأخیر
                 </TableCell>
-                <TableCell align="left" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
+                <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
                   نرخ روزانه
                 </TableCell>
-                <TableCell align="left" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
+                <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
                   مبلغ کل جریمه
                 </TableCell>
-                <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
+                <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontWeight: 'bold' }}>
                   بابت
                 </TableCell>
               </TableRow>
@@ -547,26 +552,26 @@ export default function FinanceUserPage({ params }: { params: Promise<{ id: stri
               ) : (
                 penalties.map((penalty, index) => (
                   <TableRow key={penalty.id} hover>
-                    <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                    <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
                       {penalty.installmentNumber || index + 1}
                     </TableCell>
-                    <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                    <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
                       {penalty.installmentTitle || 'نامشخص'}
                     </TableCell>
                     <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
                       {penalty.daysLate} روز
                     </TableCell>
-                    <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                    <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
                       {formatCurrency(penalty.dailyRate)}
                     </TableCell>
-                    <TableCell sx={{ 
+                    <TableCell align="center" sx={{ 
                       fontFamily: 'Vazirmatn, Arial, sans-serif',
                       color: 'error.main',
                       fontWeight: 'bold'
                     }}>
                       {formatCurrency(penalty.totalPenalty)}
                     </TableCell>
-                    <TableCell sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+                    <TableCell align="center" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
                       {penalty.reason || 'تأخیر در پرداخت'}
                     </TableCell>
                   </TableRow>
@@ -575,6 +580,28 @@ export default function FinanceUserPage({ params }: { params: Promise<{ id: stri
             </TableBody>
           </Table>
         </TableContainer>
+        
+        {/* Total Penalties Summary */}
+        {penalties.length > 0 && (
+          <Box sx={{ 
+            mt: 3, 
+            p: 2, 
+            backgroundColor: 'grey.50', 
+            borderRadius: 1,
+            textAlign: 'center'
+          }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontFamily: 'Vazirmatn, Arial, sans-serif',
+                fontWeight: 'bold',
+                color: 'error.main'
+              }}
+            >
+              جمع کل جریمه‌ها: {formatCurrency(penalties.reduce((sum, penalty) => sum + penalty.totalPenalty, 0))}
+            </Typography>
+          </Box>
+        )}
       </Paper>
 
       {/* Installment Progress Chart */}
@@ -912,6 +939,7 @@ function InstallmentForm({
       />
       
       <PersianDatePicker
+        key={`payment-${installment?.id || 'new'}`} // Force re-render when installment changes
         value={formData.paymentDate}
         onChange={(date) => setFormData({ ...formData, paymentDate: date })}
         label="تاریخ پرداخت"

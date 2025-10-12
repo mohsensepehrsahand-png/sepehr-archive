@@ -61,11 +61,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate document number
-    const documentCount = await prisma.accountingDocument.count({
-      where: { projectId }
+    // Generate document number - same as regular documents
+    const lastDocument = await prisma.accountingDocument.findFirst({
+      where: { projectId },
+      orderBy: { documentNumber: 'desc' },
+      select: { documentNumber: true }
     });
-    const documentNumber = `CL-${String(documentCount + 1).padStart(4, '0')}`;
+    
+    let documentNumber = '1';
+    if (lastDocument) {
+      const lastNumber = parseInt(lastDocument.documentNumber);
+      if (!isNaN(lastNumber)) {
+        documentNumber = (lastNumber + 1).toString();
+      }
+    }
 
     // Create the closing entry document
     const document = await prisma.accountingDocument.create({
