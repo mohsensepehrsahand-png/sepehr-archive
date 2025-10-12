@@ -95,13 +95,27 @@ yarn install
 ```
 
 ### 3. تنظیم دیتابیس
-```bash
-# ایجاد فایل .env.local
-cp .env.example .env.local
 
-# ویرایش متغیرهای محیطی
-# DATABASE_URL="postgresql://username:password@localhost:5432/sepehr_archive"
+ایجاد فایل `.env.local` در ریشه پروژه:
+
+```env
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/sepehr_archive"
+
+# Authentication
+JWT_SECRET="your-secret-key-here"
+JWT_EXPIRES_IN="7d"
+
+# Application
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NODE_ENV="development"
+
+# File Upload
+MAX_FILE_SIZE=10485760  # 10MB
+UPLOAD_DIR="./uploads"
 ```
+
+> **توجه**: مقادیر بالا را با اطلاعات واقعی خود جایگزین کنید.
 
 ### 4. اجرای Migration ها
 ```bash
@@ -119,6 +133,41 @@ npm run dev
 ```
 
 پروژه در آدرس `http://localhost:3000` در دسترس خواهد بود.
+
+### 7. اطلاعات پیش‌فرض ورود
+```
+نام کاربری: admin
+رمز عبور: admin123
+```
+
+> **توجه امنیتی**: حتماً رمز عبور پیش‌فرض را بعد از اولین ورود تغییر دهید.
+
+## 🎯 دستورات مهم
+
+```bash
+# توسعه
+npm run dev              # اجرای محیط Development
+npm run build            # ساخت برای Production
+npm run start            # اجرای Production Build
+
+# دیتابیس
+npm run db:seed          # Seed کردن دیتابیس
+npm run db:studio        # باز کردن Prisma Studio
+npm run db:reset         # ریست کردن دیتابیس
+npx prisma migrate dev   # اجرای Migration جدید
+npx prisma generate      # تولید Prisma Client
+
+# تست
+npm run test             # اجرای تست‌های واحد
+npm run test:e2e         # اجرای تست‌های E2E
+npm run test:ui          # اجرای تست با UI
+npm run test:coverage    # گزارش Coverage
+
+# کد کوالیتی
+npm run lint             # بررسی Lint
+npm run lint:fix         # رفع خودکار مشکلات Lint
+npm run format           # فرمت کردن کد
+```
 
 ## 📁 ساختار پروژه
 
@@ -254,15 +303,288 @@ docker run -p 3000:3000 sepehr-archive
 
 این پروژه تحت مجوز MIT منتشر شده است. برای جزئیات بیشتر فایل [LICENSE](LICENSE) را مطالعه کنید.
 
+## 🔧 عیب‌یابی (Troubleshooting)
+
+### مشکل اتصال به دیتابیس
+```bash
+# بررسی اتصال PostgreSQL
+psql -U username -d sepehr_archive -h localhost
+
+# راه‌اندازی مجدد PostgreSQL
+sudo service postgresql restart
+```
+
+### خطای Prisma Client
+```bash
+# تولید مجدد Prisma Client
+npx prisma generate
+
+# ریست کردن دیتابیس
+npm run db:reset
+```
+
+### خطاهای CORS
+در فایل `next.config.js` تنظیمات CORS را بررسی کنید.
+
+### مشکل در آپلود فایل
+- اطمینان حاصل کنید پوشه `uploads` وجود دارد
+- دسترسی‌های فایل را بررسی کنید
+- حداکثر سایز فایل را در `.env.local` چک کنید
+
+## 📋 سناریوهای استفاده (Use Cases)
+
+### مدیریت پروژه ساختمانی
+1. ایجاد پروژه جدید با اطلاعات کامل
+2. تعریف اقساط و زمان‌بندی پرداخت‌ها
+3. افزودن کاربران (پیمانکاران، سرمایه‌گذاران)
+4. آپلود اسناد و قراردادها
+5. ثبت پرداخت‌ها و محاسبه خودکار جریمه‌ها
+6. صدور گزارش‌های مالی و حسابداری
+
+### مدیریت حسابداری
+1. تعریف دوره مالی جدید
+2. ثبت سند افتتاحیه
+3. ثبت اسناد حسابداری روزانه
+4. مشاهده دفتر روزنامه، کل و معین
+5. صدور ترازنامه و صورت سود و زیان
+6. ثبت سند اختتامیه پایان سال
+
+## 🏗️ معماری سیستم
+
+### Architecture Overview
+```
+┌─────────────────────────────────────────────┐
+│           Client (Browser)                   │
+│  React Components + Material-UI              │
+└───────────────┬─────────────────────────────┘
+                │ HTTP/HTTPS
+                ▼
+┌─────────────────────────────────────────────┐
+│           Next.js Server                     │
+│  ├── App Router (Pages)                      │
+│  ├── API Routes (Backend)                    │
+│  └── Middleware (Auth)                       │
+└───────────────┬─────────────────────────────┘
+                │ Prisma ORM
+                ▼
+┌─────────────────────────────────────────────┐
+│          PostgreSQL Database                 │
+│  ├── Users & Auth                            │
+│  ├── Projects & Documents                    │
+│  ├── Financial Data                          │
+│  └── Accounting Records                      │
+└─────────────────────────────────────────────┘
+```
+
+### Database Schema
+پروژه از Prisma ORM استفاده می‌کند. برای مشاهده schema کامل، فایل `prisma/schema.prisma` را بررسی کنید.
+
+#### جداول اصلی:
+- `User`: کاربران سیستم
+- `Project`: پروژه‌های ساختمانی
+- `Document`: اسناد آپلود شده
+- `Folder`: پوشه‌های سازمان‌دهی
+- `InstallmentDefinition`: تعریف اقساط
+- `UserInstallment`: اقساط هر کاربر
+- `Payment`: پرداخت‌ها
+- `Receipt`: رسیدهای مالی
+- `AccountingDocument`: اسناد حسابداری
+- `AccountingTransaction`: تراکنش‌های حسابداری
+- `Account`: حساب‌های حسابداری
+- `FiscalYear`: سال‌های مالی
+
+## 🔐 امنیت
+
+### بهترین شیوه‌های امنیتی پیاده‌سازی شده:
+- ✅ هش کردن رمز عبور با bcrypt (10 rounds)
+- ✅ JWT با انقضای زمانی
+- ✅ اعتبارسنجی ورودی‌ها در سمت سرور
+- ✅ محافظت در برابر SQL Injection (Prisma ORM)
+- ✅ محافظت در برابر XSS
+- ✅ CORS Configuration
+- ✅ Rate Limiting (در API Routes)
+- ✅ کنترل دسترسی مبتنی بر نقش (RBAC)
+
+### توصیه‌های امنیتی:
+- 🔒 همیشه از HTTPS در Production استفاده کنید
+- 🔒 JWT_SECRET را پیچیده و منحصر به فرد انتخاب کنید
+- 🔒 رمز عبور پیش‌فرض را تغییر دهید
+- 🔒 به‌روزرسانی‌های امنیتی را نصب کنید
+- 🔒 Backup منظم از دیتابیس بگیرید
+
+## 🌐 API Documentation
+
+### Authentication
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+### Projects
+```http
+GET    /api/projects          # لیست پروژه‌ها
+POST   /api/projects          # ایجاد پروژه
+GET    /api/projects/:id      # جزئیات پروژه
+PUT    /api/projects/:id      # ویرایش پروژه
+DELETE /api/projects/:id      # حذف پروژه
+```
+
+### Documents
+```http
+GET    /api/documents         # لیست اسناد
+POST   /api/upload            # آپلود سند
+DELETE /api/documents/:id     # حذف سند
+```
+
+### Finance
+```http
+GET    /api/finance/projects/:id/users/:userId/installments
+POST   /api/finance/payments
+GET    /api/finance/receipts
+```
+
+### Accounting
+```http
+GET    /api/accounting/fiscal-years
+POST   /api/accounting/documents
+GET    /api/accounting/daybook
+GET    /api/accounting/ledger
+GET    /api/accounting/trial-balance
+```
+
+## 📊 مدل‌های داده اصلی
+
+### User Model
+```typescript
+{
+  id: string
+  username: string
+  password: string (hashed)
+  fullName: string
+  role: "ADMIN" | "BUYER" | "CONTRACTOR" | "SUPPLIER"
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+### Project Model
+```typescript
+{
+  id: string
+  name: string
+  color: string
+  totalBudget: Decimal
+  status: string
+  archived: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+## 📈 نقشه راه (Roadmap)
+
+### نسخه‌های آینده
+
+#### v2.0 (در حال توسعه)
+- [ ] پشتیبانی از چند زبانه (انگلیسی، عربی)
+- [ ] اپلیکیشن موبایل (React Native)
+- [ ] اعلان‌های Real-time با WebSocket
+- [ ] سیستم چت داخلی
+- [ ] ویرایشگر آنلاین اسناد
+
+#### v2.1 (برنامه‌ریزی شده)
+- [ ] هوش مصنوعی برای پیش‌بینی مالی
+- [ ] تشخیص خودکار OCR برای اسناد
+- [ ] یکپارچه‌سازی با نرم‌افزارهای حسابداری
+- [ ] گزارش‌دهی پیشرفته با Power BI
+
+## ❓ سوالات متداول (FAQ)
+
+### چگونه یک پروژه جدید ایجاد کنم؟
+از منوی Projects > New Project استفاده کنید.
+
+### چگونه اقساط را تعریف کنم؟
+در صفحه پروژه، تب Finance > Installments را انتخاب کنید.
+
+### چگونه سند حسابداری ثبت کنم؟
+Accounting > Documents > New Document
+
+### چگونه Backup بگیرم؟
+```bash
+# Backup دیتابیس
+pg_dump -U username sepehr_archive > backup.sql
+
+# Backup فایل‌ها
+tar -czf uploads_backup.tar.gz uploads/
+```
+
+### چگونه از SQLite به PostgreSQL مهاجرت کنم؟
+پروژه از PostgreSQL استفاده می‌کند و SQLite پشتیبانی نمی‌شود.
+
 ## 📞 پشتیبانی
 
 - **ایمیل**: support@sepehr-archive.com
 - **تلفن**: +98-21-1234-5678
 - **وب‌سایت**: https://sepehr-archive.com
+- **GitHub Issues**: [گزارش مشکل](https://github.com/mohsensepehrsahand-png/sepehr-archive/issues)
+
+## 🤝 راهنمای مشارکت
+
+### قبل از شروع
+1. Issue جدید ایجاد کنید یا یکی از Issueهای موجود را انتخاب کنید
+2. با تیم توسعه هماهنگ کنید
+3. استانداردهای کدنویسی را رعایت کنید
+
+### استانداردهای کدنویسی
+- از TypeScript استفاده کنید
+- از ESLint و Prettier پیروی کنید
+- تست برای کدهای جدید بنویسید
+- کامنت‌های فارسی برای توضیحات پیچیده
+- نام متغیرها به انگلیسی
+
+### پروسه Review
+1. کد را بررسی می‌کنیم
+2. تست‌ها را اجرا می‌کنیم
+3. نظرات را ارائه می‌دهیم
+4. بعد از تایید، Merge می‌کنیم
+
+## 📝 Changelog
+
+### [v1.5.0] - 2025-01-12
+#### اضافه شده
+- سیستم حسابداری کامل با دفاتر سه‌گانه
+- مدیریت سال مالی و دوره‌های مالی
+- سند افتتاحیه و اختتامیه
+- گزارش‌های مالی پیشرفته
+
+#### بهبود یافته
+- بهینه‌سازی عملکرد دیتابیس
+- رابط کاربری موبایل
+- سیستم احراز هویت
+
+#### رفع شده
+- مشکل محاسبه جریمه دیرکرد
+- خطا در ویرایش تاریخ پرداخت
+- مشکل آپلود فایل‌های بزرگ
+
+### [v1.0.0] - 2024-09-06
+- انتشار اولیه
 
 ## 🙏 تشکر
 
 از تمام کسانی که در توسعه این پروژه مشارکت داشته‌اند، صمیمانه تشکر می‌کنیم.
+
+### تکنولوژی‌ها و ابزارهای استفاده شده
+- [Next.js](https://nextjs.org/) - فریمورک React
+- [Prisma](https://prisma.io/) - ORM
+- [Material-UI](https://mui.com/) - کتابخانه UI
+- [TanStack Query](https://tanstack.com/query) - مدیریت State
+- [PostgreSQL](https://postgresql.org/) - دیتابیس
 
 ---
 
