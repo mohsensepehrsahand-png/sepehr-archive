@@ -711,7 +711,7 @@ export default function SubsidiaryLedger({ projectId }: Props) {
                 {table.accountName} ({table.accountCode})
               </Typography>
               
-              <TableContainer component={Paper} sx={{ width: '7cm' }}>
+              <TableContainer component={Paper} sx={{ width: '100%' }}>
                 <Table>
                   <TableHead>
                     <TableRow sx={{ backgroundColor: '#757575' }}>
