@@ -9,6 +9,12 @@
     "lint": "next lint",
     "test": "vitest",
     "test:ui": "vitest --ui",
+    "test:security": "tsx scripts/test-security-complete.ts",
+    "test:security:auth": "tsx scripts/test-security-auth.ts",
+    "test:security:authz": "tsx scripts/test-security-authorization.ts",
+    "test:security:brute": "tsx scripts/test-security-bruteforce.ts",
+    "test:security:resources": "tsx scripts/test-security-resources.ts",
+    "test:security:settings": "tsx scripts/test-security-settings.ts",
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {

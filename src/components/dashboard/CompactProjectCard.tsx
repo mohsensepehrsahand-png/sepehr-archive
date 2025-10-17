@@ -1,6 +1,6 @@
 "use client";
 import { Card, CardContent, Typography, Box, Chip, Avatar, useTheme, alpha } from "@mui/material";
-import { Folder, Description, Person, CalendarToday } from "@mui/icons-material";
+import { Folder, Description, Person, CalendarToday, FolderOpen } from "@mui/icons-material";
 import Link from "next/link";
 import type { Project } from "@/contexts/ProjectContext";
 
@@ -107,7 +107,17 @@ export default function CompactProjectCard({ project }: CompactProjectCardProps)
         </Typography>
 
         {/* Project Stats */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1.5, mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <FolderOpen sx={{ fontSize: 14, mr: 0.5, color: 'text.secondary' }} />
+            <Typography 
+              variant="caption" 
+              color="text.secondary" 
+              sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontSize: '0.7rem' }}
+            >
+              {project.folders || 0} پوشه
+            </Typography>
+          </Box>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Description sx={{ fontSize: 14, mr: 0.5, color: 'text.secondary' }} />
             <Typography 
@@ -116,21 +126,6 @@ export default function CompactProjectCard({ project }: CompactProjectCardProps)
               sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif', fontSize: '0.7rem' }}
             >
               {safeDocuments} سند
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Person sx={{ fontSize: 14, mr: 0.5, color: 'text.secondary' }} />
-            <Typography 
-              variant="caption" 
-              color="text.secondary" 
-              noWrap 
-              sx={{ 
-                fontFamily: 'Vazirmatn, Arial, sans-serif', 
-                fontSize: '0.7rem',
-                maxWidth: 60
-              }}
-            >
-              {safeCreatedBy}
             </Typography>
           </Box>
         </Box>
@@ -146,7 +141,7 @@ export default function CompactProjectCard({ project }: CompactProjectCardProps)
               fontSize: '0.7rem'
             }}
           >
-            {safeCreatedAt}
+            تاریخ ایجاد: {safeCreatedAt}
           </Typography>
         </Box>
       </CardContent>

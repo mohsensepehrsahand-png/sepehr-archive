@@ -16,12 +16,11 @@ import WidgetSelector, { WidgetType } from "@/components/dashboard/WidgetSelecto
 import SmartSearchWidget from "@/components/dashboard/SmartSearchWidget";
 import RecentProjectsWidget from "@/components/dashboard/RecentProjectsWidget";
 import StatisticsWidget from "@/components/dashboard/StatisticsWidget";
-import RecentActivitiesWidget from "@/components/dashboard/RecentActivitiesWidget";
 import RecentDocumentsWidget from "@/components/dashboard/RecentDocumentsWidget";
 import FinancialSummaryWidget from "@/components/dashboard/FinancialSummaryWidget";
 import ProjectPaymentProgressWidget from "@/components/dashboard/ProjectPaymentProgressWidget";
 import DateTimeWidget from "@/components/dashboard/DateTimeWidget";
-import { Search, FolderOpen, Assessment, History, Description, AccountBalance, Timeline, AccessTime } from "@mui/icons-material";
+import { Search, FolderOpen, Assessment, Description, AccountBalance, Timeline, AccessTime } from "@mui/icons-material";
 
 const AVAILABLE_WIDGETS: WidgetType[] = [
   {
@@ -43,13 +42,6 @@ const AVAILABLE_WIDGETS: WidgetType[] = [
     name: 'آمار کلی',
     description: 'نمایش آمار کلی پروژه‌ها و اسناد',
     icon: <Assessment />,
-    size: 'medium'
-  },
-  {
-    id: 'activities',
-    name: 'فعالیت‌های اخیر',
-    description: 'نمایش آخرین فعالیت‌های سیستم',
-    icon: <History />,
     size: 'medium'
   },
   {
@@ -163,8 +155,6 @@ export default function DashboardPage() {
         return <RecentProjectsWidget projects={projects} onRefresh={refetch} isLoading={isLoading} />;
       case 'statistics':
         return <StatisticsWidget projects={projects} />;
-      case 'activities':
-        return <RecentActivitiesWidget activities={recentActivities} onRefresh={refetch} isLoading={isLoading} />;
       case 'documents':
         return <RecentDocumentsWidget documents={recentDocuments} onRefresh={refetch} isLoading={isLoading} />;
       case 'financialSummary':

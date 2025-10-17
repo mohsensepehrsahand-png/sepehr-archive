@@ -5,6 +5,15 @@ import { logActivity } from "@/lib/activityLogger";
 // GET /api/projects - دریافت لیست پروژه‌ها
 export async function GET(request: NextRequest) {
   try {
+    // بررسی احراز هویت
+    const authToken = request.cookies.get('authToken')?.value;
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'لطفاً وارد سیستم شوید' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const status = searchParams.get('status');
@@ -116,6 +125,15 @@ export async function GET(request: NextRequest) {
 // POST /api/projects - ایجاد پروژه جدید
 export async function POST(request: NextRequest) {
   try {
+    // بررسی احراز هویت
+    const authToken = request.cookies.get('authToken')?.value;
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'لطفاً وارد سیستم شوید' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { name, description, status = 'ACTIVE', createdBy } = body;
 

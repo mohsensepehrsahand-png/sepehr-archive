@@ -8,8 +8,26 @@ const prisma = new PrismaClient();
 prisma.$connect();
 
 // GET /api/users - دریافت لیست کاربران
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // بررسی احراز هویت
+    const authToken = request.cookies.get('authToken')?.value;
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'لطفاً وارد سیستم شوید' },
+        { status: 401 }
+      );
+    }
+
+    // بررسی نقش کاربر - فقط Admin می‌تواند لیست کاربران را ببیند
+    const userRole = request.cookies.get('userRole')?.value;
+    if (userRole !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'شما مجوز دسترسی به این بخش را ندارید' },
+        { status: 403 }
+      );
+    }
+
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -50,6 +68,24 @@ export async function GET() {
 // POST /api/users - ایجاد کاربر جدید
 export async function POST(request: NextRequest) {
   try {
+    // بررسی احراز هویت
+    const authToken = request.cookies.get('authToken')?.value;
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'لطفاً وارد سیستم شوید' },
+        { status: 401 }
+      );
+    }
+
+    // بررسی نقش کاربر - فقط Admin می‌تواند کاربر ایجاد کند
+    const userRole = request.cookies.get('userRole')?.value;
+    if (userRole !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'شما مجوز ایجاد کاربر را ندارید' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     console.log('Received user data:', { ...body, password: '[HIDDEN]' });
     

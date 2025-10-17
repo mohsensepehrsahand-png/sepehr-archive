@@ -8,6 +8,7 @@ export interface Project {
   description: string;
   status: string;
   documents: number;
+  folders: number;
   createdBy: string;
   createdAt: string;
   colorPrimary: string;
@@ -20,7 +21,7 @@ export interface Project {
 interface ProjectContextType {
   projects: Project[];
   loading: boolean;
-  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'colorPrimary' | 'colorFolderDefault' | 'documents' | 'createdBy'>) => Promise<Project>;
+  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'colorPrimary' | 'colorFolderDefault' | 'documents' | 'folders' | 'createdBy'>) => Promise<Project>;
   deleteProject: (id: string, forceDelete?: boolean) => Promise<void>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<Project>;
   refreshProjects: () => Promise<void>;
@@ -97,7 +98,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'colorPrimary' | 'colorFolderDefault' | 'documents' | 'createdBy'>) => {
+  const addProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'colorPrimary' | 'colorFolderDefault' | 'documents' | 'folders' | 'createdBy'>) => {
     try {
       // ابتدا کاربر admin را پیدا می‌کنیم
       const userResponse = await fetch('/api/users');

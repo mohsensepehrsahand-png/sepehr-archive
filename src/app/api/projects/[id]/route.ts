@@ -10,12 +10,42 @@ export async function GET(
   try {
     const cookieStore = await cookies();
     const userRole = cookieStore.get('userRole')?.value;
-
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
+    const userDataCookie = cookieStore.get('userData')?.value;
 
     const { id: projectId } = await params;
+
+    // بررسی دسترسی: Admin یا کاربرانی که Permission دارند
+    if (userRole !== 'ADMIN') {
+      let userId = null;
+      if (userDataCookie) {
+        try {
+          const userData = JSON.parse(userDataCookie);
+          userId = userData.id;
+        } catch (error) {
+          console.error('Error parsing userData:', error);
+        }
+      }
+
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // بررسی Permission کاربر برای این پروژه
+      const userPermission = await prisma.permission.findFirst({
+        where: {
+          userId: userId,
+          resourceType: 'PROJECT',
+          resourceId: projectId,
+          accessLevel: {
+            in: ['VIEW', 'ADD', 'ADMIN']
+          }
+        }
+      });
+
+      if (!userPermission) {
+        return NextResponse.json({ error: 'شما دسترسی به این پروژه ندارید' }, { status: 403 });
+      }
+    }
 
     const project = await prisma.project.findUnique({
       where: { id: projectId },

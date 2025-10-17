@@ -1,6 +1,6 @@
 "use client";
 import { Card, CardContent, Typography, Box, Chip, Button, Avatar, IconButton, useTheme, alpha } from "@mui/material";
-import { Folder, Visibility, Edit, Delete, MoreVert } from "@mui/icons-material";
+import { Folder, Visibility, Edit, Delete, MoreVert, FolderOpen, Description } from "@mui/icons-material";
 import Link from "next/link";
 import { formatPersianDateShort } from "@/utils/dateUtils";
 
@@ -10,6 +10,7 @@ interface DesktopProjectCardProps {
   description: string;
   status: string;
   documents: number;
+  folders: number;
   createdBy: string;
   createdAt: string;
   colorPrimary: string;
@@ -24,6 +25,7 @@ export default function DesktopProjectCard({
   description,
   status,
   documents,
+  folders,
   createdBy,
   createdAt,
   colorPrimary,
@@ -112,19 +114,31 @@ export default function DesktopProjectCard({
         {/* Stats */}
         <Box sx={{ 
           display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
+          gap: 2,
           mb: 2,
-          py: 1,
+          py: 1.5,
           px: 2,
           bgcolor: alpha(theme.palette.primary.main, 0.05),
           borderRadius: 2
         }}>
-          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
-            {documents} سند
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <FolderOpen sx={{ fontSize: 18, color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+              {folders} پوشه
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Description sx={{ fontSize: 18, color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
+              {documents} سند
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Created Date */}
+        <Box sx={{ mb: 2 }}>
           <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'Vazirmatn, Arial, sans-serif' }}>
-            {formatPersianDateShort(createdAt)}
+            تاریخ ایجاد پروژه: {formatPersianDateShort(createdAt)}
           </Typography>
         </Box>
 

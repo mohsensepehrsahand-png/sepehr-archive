@@ -239,3 +239,4 @@ export default function SmartSearchWidget({ projects, recentDocuments }: SmartSe
   );
 }
 
+

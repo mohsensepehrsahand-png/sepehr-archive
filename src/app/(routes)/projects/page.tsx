@@ -236,6 +236,7 @@ export default function ProjectListPage() {
               description={project.description}
               status={project.status}
               documents={project.documents}
+              folders={project.folders || 0}
               createdBy={project.createdBy}
               createdAt={project.createdAt}
               colorPrimary={project.colorPrimary}
@@ -255,6 +256,7 @@ export default function ProjectListPage() {
                 description={project.description}
                 status={project.status}
                 documents={project.documents}
+                folders={project.folders || 0}
                 createdBy={project.createdBy}
                 createdAt={project.createdAt}
                 colorPrimary={project.colorPrimary}
